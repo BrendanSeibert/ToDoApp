@@ -1,5 +1,5 @@
 import type { User } from "~/api/auth";
-import AccountSettings from "./AccountSettings";
+import Navbar from "./Navbar";
 import TodoList from "./TodoList";
 import "./TodoApp.scss";
 
@@ -10,10 +10,7 @@ interface TodoAppProps {
 export default function TodoApp(props: TodoAppProps) {
   return (
     <div class="d-todo-app todo-app">
-      <header>
-        <h1>Todos</h1>
-        <AccountSettings user={props.user} />
-      </header>
+      <Navbar user={props.user} />
       <TodoList />
     </div>
   );
