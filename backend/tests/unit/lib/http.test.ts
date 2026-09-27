@@ -22,15 +22,11 @@ describe("json", () => {
     expect(json({}).status).toBe(200);
   });
 
-  it("adds CORS headers when the request origin is the allowed frontend origin", () => {
+  it("wires the allowed-origin CORS headers from ~/lib/cors into the response", () => {
+    // Exhaustive origin-matching cases (unrecognized origin, no origin, etc.) live in cors.test.ts.
     const response = json({}, 200, eventWithOrigin(ALLOWED_ORIGIN));
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
     expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
-  });
-
-  it("omits CORS headers for a request from an unrecognized origin", () => {
-    const response = json({}, 200, eventWithOrigin("http://evil.example"));
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
   it("omits CORS headers when no event is passed", () => {

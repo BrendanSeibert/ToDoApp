@@ -1,21 +1,14 @@
 import type { APIEvent } from "@solidjs/start/server";
+import { getCorsHeaders } from "./cors";
 import { UnauthorizedError } from "./session";
 
 export class ValidationError extends Error {}
 export class AuthenticationError extends Error {}
 
-const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
-
-function addCorsHeaders(headers: Headers, event?: APIEvent): void {
-  const origin = event?.request.headers.get("origin");
-  if (!origin || origin !== allowedOrigin) return;
-  headers.set("Access-Control-Allow-Origin", origin);
-  headers.set("Access-Control-Allow-Credentials", "true");
-}
-
 export function json(data: unknown, status = 200, event?: APIEvent): Response {
   const headers = new Headers({ "Content-Type": "application/json" });
-  addCorsHeaders(headers, event);
+  const corsHeaders = getCorsHeaders(event?.request.headers.get("origin"));
+  corsHeaders?.forEach((value, key) => headers.set(key, value));
   return new Response(JSON.stringify(data), { status, headers });
 }
 

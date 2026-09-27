@@ -1,16 +1,13 @@
 import { createMiddleware } from "@solidjs/start/middleware";
-
-const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
+import { getCorsHeaders } from "./lib/cors";
 
 export default createMiddleware({
   onRequest: (event) => {
     if (event.request.method !== "OPTIONS") return;
 
-    const origin = event.request.headers.get("origin");
-    const headers = new Headers();
-    if (origin === allowedOrigin) {
-      headers.set("Access-Control-Allow-Origin", origin);
-      headers.set("Access-Control-Allow-Credentials", "true");
+    const corsHeaders = getCorsHeaders(event.request.headers.get("origin"));
+    const headers = new Headers(corsHeaders ?? undefined);
+    if (corsHeaders) {
       headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
       headers.set("Access-Control-Allow-Headers", "Content-Type");
     }
