@@ -1,0 +1,15 @@
+node_modules/
+.env
+*.log
+
+# Backend (SolidStart/vinxi)
+backend/.output/
+backend/.vinxi/
+backend/dist/
+
+# Frontend (Vite)
+frontend/dist/
+
+# Editor/OS
+.DS_Store
+.vscode/
