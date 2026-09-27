@@ -1,4 +1,5 @@
 import { onMount, Show } from "solid-js";
+import "./App.scss";
 import { getMe } from "~/api/auth";
 import { finishInitializing, initializing, setCurrentUser, user } from "~/store/auth";
 import AuthForms from "./components/AuthForms";

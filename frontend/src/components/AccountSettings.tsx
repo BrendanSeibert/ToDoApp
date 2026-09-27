@@ -1,4 +1,5 @@
 import { createSignal, Show } from "solid-js";
+import "./AccountSettings.scss";
 import { deleteAccount, logout, type User } from "~/api/auth";
 import { ApiError } from "~/api/client";
 import { setCurrentUser } from "~/store/auth";
@@ -32,7 +33,7 @@ export default function AccountSettings(props: AccountSettingsProps) {
   }
 
   return (
-    <div class="account-settings">
+    <div class="d-account-settings account-settings">
       <span>{props.user.email}</span>
       <button type="button" onClick={handleLogout}>
         Log out

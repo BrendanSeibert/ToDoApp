@@ -1,6 +1,7 @@
 import type { User } from "~/api/auth";
 import AccountSettings from "./AccountSettings";
 import TodoList from "./TodoList";
+import "./TodoApp.scss";
 
 interface TodoAppProps {
   user: User;
@@ -8,7 +9,7 @@ interface TodoAppProps {
 
 export default function TodoApp(props: TodoAppProps) {
   return (
-    <div class="todo-app">
+    <div class="d-todo-app todo-app">
       <header>
         <h1>Todos</h1>
         <AccountSettings user={props.user} />

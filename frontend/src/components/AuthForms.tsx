@@ -1,4 +1,5 @@
 import { createSignal, Show } from "solid-js";
+import "./AuthForms.scss";
 import { login, register } from "~/api/auth";
 import { ApiError } from "~/api/client";
 import { setCurrentUser } from "~/store/auth";
@@ -26,7 +27,7 @@ export default function AuthForms() {
   }
 
   return (
-    <div class="auth-forms">
+    <div class="d-auth-forms auth-forms">
       <h1>{mode() === "login" ? "Log in" : "Create an account"}</h1>
 
       <form onSubmit={handleSubmit}>

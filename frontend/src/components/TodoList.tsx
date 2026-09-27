@@ -1,4 +1,5 @@
 import { createSignal, For, onMount, Show } from "solid-js";
+import "./TodoList.scss";
 import { createTodo, deleteTodo, listTodos, setCompleted, type Todo } from "~/api/todos";
 import { ApiError } from "~/api/client";
 import TodoItem from "./TodoItem";
@@ -55,7 +56,7 @@ export default function TodoList() {
   }
 
   return (
-    <section class="todo-list">
+    <section class="d-todo-list todo-list">
       <form onSubmit={handleCreate}>
         <input
           type="text"

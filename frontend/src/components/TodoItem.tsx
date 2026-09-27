@@ -1,4 +1,5 @@
 import type { Todo } from "~/api/todos";
+import "./TodoItem.scss";
 
 interface TodoItemProps {
   todo: Todo;
@@ -8,7 +9,7 @@ interface TodoItemProps {
 
 export default function TodoItem(props: TodoItemProps) {
   return (
-    <li class="todo-item">
+    <li class="d-todo-item todo-item">
       <label>
         <input
           type="checkbox"
