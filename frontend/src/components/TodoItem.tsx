@@ -1,4 +1,5 @@
 import type { Todo } from "~/api/todos";
+import { useI18n } from "~/context/I18nContext";
 import "./TodoItem.scss";
 
 interface TodoItemProps {
@@ -8,6 +9,8 @@ interface TodoItemProps {
 }
 
 export default function TodoItem(props: TodoItemProps) {
+  const { t } = useI18n();
+
   return (
     <li class="d-todo-item todo-item">
       <label>
@@ -18,8 +21,12 @@ export default function TodoItem(props: TodoItemProps) {
         />
         <span classList={{ completed: props.todo.completed }}>{props.todo.title}</span>
       </label>
-      <button type="button" aria-label={`Delete ${props.todo.title}`} onClick={() => props.onDelete(props.todo.id)}>
-        Delete
+      <button
+        type="button"
+        aria-label={t("todoItem.deleteAria", { title: props.todo.title })}
+        onClick={() => props.onDelete(props.todo.id)}
+      >
+        {t("todoItem.delete")}
       </button>
     </li>
   );

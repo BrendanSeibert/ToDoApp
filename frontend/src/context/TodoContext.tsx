@@ -19,6 +19,7 @@ import {
 } from "~/api/todos";
 import { ApiError } from "~/api/client";
 import { useAuth } from "./AuthContext";
+import { useI18n } from "./I18nContext";
 
 interface TodoContextValue {
   todos: Accessor<Todo[]>;
@@ -55,6 +56,7 @@ function errorMessage(err: unknown, fallback: string): string {
 
 export function TodoProvider(props: TodoProviderProps) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [actionError, setActionError] = createSignal<string | null>(null);
 
   // Keyed by user id: a new user triggers a refetch, and responses from a superseded
@@ -82,7 +84,7 @@ export function TodoProvider(props: TodoProviderProps) {
   const todos = () => (todosResource.state === "errored" ? [] : todosResource());
   const loading = () => todosResource.loading;
   const error = () =>
-    actionError() ?? (todosResource.error ? errorMessage(todosResource.error, "Failed to load todos.") : null);
+    actionError() ?? (todosResource.error ? errorMessage(todosResource.error, t("errors.loadTodos")) : null);
 
   // True if the user changed while a request was in flight, so its result must be dropped.
   const userChangedSince = (ownerId: string | undefined) => user()?.id !== ownerId;
@@ -96,7 +98,7 @@ export function TodoProvider(props: TodoProviderProps) {
       setActionError(null);
       return true;
     } catch (err) {
-      if (!userChangedSince(ownerId)) setActionError(errorMessage(err, "Failed to create todo."));
+      if (!userChangedSince(ownerId)) setActionError(errorMessage(err, t("errors.createTodo")));
       return false;
     }
   }
@@ -116,7 +118,7 @@ export function TodoProvider(props: TodoProviderProps) {
     } catch (err) {
       if (userChangedSince(ownerId)) return false;
       if (previous !== undefined) setTodoCompleted(previous);
-      setActionError(errorMessage(err, "Failed to update todo."));
+      setActionError(errorMessage(err, t("errors.updateTodo")));
       return false;
     }
   }
@@ -130,7 +132,7 @@ export function TodoProvider(props: TodoProviderProps) {
       setActionError(null);
       return true;
     } catch (err) {
-      if (!userChangedSince(ownerId)) setActionError(errorMessage(err, "Failed to delete todo."));
+      if (!userChangedSince(ownerId)) setActionError(errorMessage(err, t("errors.deleteTodo")));
       return false;
     }
   }

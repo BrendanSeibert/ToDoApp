@@ -3,9 +3,11 @@ import "./AuthForms.scss";
 import { login, register } from "~/api/auth";
 import { ApiError } from "~/api/client";
 import { useAuth } from "~/context/AuthContext";
+import { useI18n } from "~/context/I18nContext";
 
 export default function AuthForms() {
   const { setCurrentUser } = useAuth();
+  const { t } = useI18n();
   const [mode, setMode] = createSignal<"login" | "register">("login");
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
@@ -21,7 +23,7 @@ export default function AuthForms() {
       const user = mode() === "login" ? await login(email(), password()) : await register(email(), password());
       setCurrentUser(user);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      setError(err instanceof ApiError ? err.message : t("auth.genericError"));
     } finally {
       setSubmitting(false);
     }
@@ -29,11 +31,11 @@ export default function AuthForms() {
 
   return (
     <div class="d-auth-forms auth-forms">
-      <h1>{mode() === "login" ? "Log in" : "Create an account"}</h1>
+      <h1>{mode() === "login" ? t("auth.login.heading") : t("auth.register.heading")}</h1>
 
       <form onSubmit={handleSubmit}>
         <label>
-          Email
+          {t("auth.email")}
           <input
             type="email"
             required
@@ -44,7 +46,7 @@ export default function AuthForms() {
         </label>
 
         <label>
-          Password
+          {t("auth.password")}
           <input
             type="password"
             required
@@ -62,7 +64,7 @@ export default function AuthForms() {
         </Show>
 
         <button type="submit" disabled={submitting()}>
-          {mode() === "login" ? "Log in" : "Register"}
+          {mode() === "login" ? t("auth.login.submit") : t("auth.register.submit")}
         </button>
       </form>
 
@@ -74,7 +76,7 @@ export default function AuthForms() {
           setMode(mode() === "login" ? "register" : "login");
         }}
       >
-        {mode() === "login" ? "Need an account? Register" : "Already have an account? Log in"}
+        {mode() === "login" ? t("auth.login.switchToRegister") : t("auth.register.switchToLogin")}
       </button>
     </div>
   );

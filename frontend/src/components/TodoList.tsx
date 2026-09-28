@@ -1,10 +1,12 @@
 import { createSignal, For, Show } from "solid-js";
 import "./TodoList.scss";
+import { useI18n } from "~/context/I18nContext";
 import { useTodos } from "~/context/TodoContext";
 import TodoItem from "./TodoItem";
 
 export default function TodoList() {
   const { todos, loading, error, createTodo, toggleTodo, deleteTodo } = useTodos();
+  const { t } = useI18n();
   const [newTitle, setNewTitle] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
   // Adding during the initial fetch would be overwritten when it lands; adding while a
@@ -40,11 +42,11 @@ export default function TodoList() {
         <fieldset disabled={formDisabled()}>
           <input
             type="text"
-            placeholder="What needs doing?"
+            placeholder={t("todos.placeholder")}
             value={newTitle()}
             onInput={(e) => setNewTitle(e.currentTarget.value)}
           />
-          <button type="submit">Add</button>
+          <button type="submit">{t("todos.add")}</button>
         </fieldset>
       </form>
 
@@ -54,8 +56,8 @@ export default function TodoList() {
         </p>
       </Show>
 
-      <Show when={!loading()} fallback={<p>Loading todos…</p>}>
-        <Show when={todos().length > 0} fallback={<p>No todos yet.</p>}>
+      <Show when={!loading()} fallback={<p>{t("todos.loading")}</p>}>
+        <Show when={todos().length > 0} fallback={<p>{t("todos.empty")}</p>}>
           <ul>
             <For each={todos()}>{(todo) => <TodoItem todo={todo} onToggle={handleToggle} onDelete={handleDelete} />}</For>
           </ul>

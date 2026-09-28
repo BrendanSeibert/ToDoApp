@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSignal, For } from "solid-js";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, screen, waitFor } from "@solidjs/testing-library";
+import { renderWithI18n } from "../helpers/renderWithI18n";
 
 vi.mock("~/api/todos", () => ({
   listTodos: vi.fn(),
@@ -45,7 +46,7 @@ function deferred<T>() {
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function renderProvider() {
-  return render(() => (
+  return renderWithI18n(() => (
     <TodoProvider>
       <Consumer />
     </TodoProvider>
@@ -98,7 +99,7 @@ beforeEach(() => {
 
 describe("TodoProvider", () => {
   it("does not fetch todos when there is no logged-in user", () => {
-    render(() => (
+    renderWithI18n(() => (
       <TodoProvider>
         <Consumer />
       </TodoProvider>
@@ -109,7 +110,7 @@ describe("TodoProvider", () => {
 
   it("fetches the user's todos when they log in", async () => {
     mockedListTodos.mockResolvedValue([{ id: "t1", title: "Buy milk", completed: false }]);
-    render(() => (
+    renderWithI18n(() => (
       <TodoProvider>
         <Consumer />
       </TodoProvider>
@@ -123,7 +124,7 @@ describe("TodoProvider", () => {
 
   it("resets the store when the user logs out", async () => {
     mockedListTodos.mockResolvedValue([{ id: "t1", title: "Buy milk", completed: false }]);
-    render(() => (
+    renderWithI18n(() => (
       <TodoProvider>
         <Consumer />
       </TodoProvider>
@@ -138,7 +139,7 @@ describe("TodoProvider", () => {
 
   it("sets an error message when the initial fetch fails", async () => {
     mockedListTodos.mockRejectedValue(new Error("boom"));
-    render(() => (
+    renderWithI18n(() => (
       <TodoProvider>
         <Consumer />
       </TodoProvider>

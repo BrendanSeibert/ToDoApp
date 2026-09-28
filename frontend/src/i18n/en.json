@@ -1,0 +1,49 @@
+{
+  "app": {
+    "title": "Todo List",
+    "loading": "Loading…"
+  },
+  "navbar": {
+    "todos": "Todos"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "genericError": "Something went wrong. Please try again.",
+    "login": {
+      "heading": "Log in",
+      "submit": "Log in",
+      "switchToRegister": "Need an account? Register"
+    },
+    "register": {
+      "heading": "Create an account",
+      "submit": "Register",
+      "switchToLogin": "Already have an account? Log in"
+    }
+  },
+  "account": {
+    "logout": "Log out",
+    "deleteAccount": "Delete account",
+    "deleteConfirmation": "Are you sure? This deletes your account and all todos.",
+    "confirmDelete": "Confirm delete",
+    "cancel": "Cancel",
+    "logoutError": "Failed to log out.",
+    "deleteError": "Failed to delete account."
+  },
+  "todos": {
+    "placeholder": "What needs doing?",
+    "add": "Add",
+    "loading": "Loading todos…",
+    "empty": "No todos yet."
+  },
+  "todoItem": {
+    "delete": "Delete",
+    "deleteAria": "Delete {title}"
+  },
+  "errors": {
+    "loadTodos": "Failed to load todos.",
+    "createTodo": "Failed to create todo.",
+    "updateTodo": "Failed to update todo.",
+    "deleteTodo": "Failed to delete todo."
+  }
+}

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { fireEvent, screen } from "@solidjs/testing-library";
+import { renderWithI18n } from "../helpers/renderWithI18n";
 
 vi.mock("~/api/auth", () => ({
   logout: vi.fn(),
@@ -27,13 +28,13 @@ beforeEach(() => {
 
 describe("AccountSettings", () => {
   it("shows the user's email", () => {
-    render(() => <AccountSettings />);
+    renderWithI18n(() => <AccountSettings />);
     expect(screen.getByText("a@example.com")).toBeInTheDocument();
   });
 
   it("logs out and clears the current user", async () => {
     mockedLogout.mockResolvedValue({ ok: true });
-    render(() => <AccountSettings />);
+    renderWithI18n(() => <AccountSettings />);
 
     await fireEvent.click(screen.getByRole("button", { name: "Log out" }));
 
@@ -43,7 +44,7 @@ describe("AccountSettings", () => {
 
   it("requires confirmation before deleting the account", async () => {
     mockedDeleteAccount.mockResolvedValue({ ok: true });
-    render(() => <AccountSettings />);
+    renderWithI18n(() => <AccountSettings />);
 
     await fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
     expect(mockedDeleteAccount).not.toHaveBeenCalled();
@@ -55,7 +56,7 @@ describe("AccountSettings", () => {
   });
 
   it("cancels the delete confirmation without deleting", async () => {
-    render(() => <AccountSettings />);
+    renderWithI18n(() => <AccountSettings />);
 
     await fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
     await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));

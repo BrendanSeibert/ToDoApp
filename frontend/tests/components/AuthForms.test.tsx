@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { fireEvent, screen } from "@solidjs/testing-library";
+import { renderWithI18n } from "../helpers/renderWithI18n";
 
 vi.mock("~/api/auth", () => ({
   login: vi.fn(),
@@ -27,7 +28,7 @@ beforeEach(() => {
 describe("AuthForms", () => {
   it("defaults to login mode and logs in with the entered credentials", async () => {
     mockedLogin.mockResolvedValue({ id: "u1", email: "a@example.com", createdAt: "now" });
-    render(() => <AuthForms />);
+    renderWithI18n(() => <AuthForms />);
 
     await fireEvent.input(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
     await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "password123" } });
@@ -39,7 +40,7 @@ describe("AuthForms", () => {
 
   it("switches to register mode and registers with the entered credentials", async () => {
     mockedRegister.mockResolvedValue({ id: "u2", email: "b@example.com", createdAt: "now" });
-    render(() => <AuthForms />);
+    renderWithI18n(() => <AuthForms />);
 
     await fireEvent.click(screen.getByText(/need an account/i));
     await fireEvent.input(screen.getByLabelText("Email"), { target: { value: "b@example.com" } });
@@ -52,7 +53,7 @@ describe("AuthForms", () => {
 
   it("shows an error message when login fails", async () => {
     mockedLogin.mockRejectedValue(new ApiError(401, "Invalid email or password"));
-    render(() => <AuthForms />);
+    renderWithI18n(() => <AuthForms />);
 
     await fireEvent.input(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
     await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "wrongpassword" } });

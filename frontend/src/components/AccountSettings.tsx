@@ -3,9 +3,11 @@ import "./AccountSettings.scss";
 import { deleteAccount, logout } from "~/api/auth";
 import { ApiError } from "~/api/client";
 import { useAuth } from "~/context/AuthContext";
+import { useI18n } from "~/context/I18nContext";
 
 export default function AccountSettings() {
   const { user, setCurrentUser } = useAuth();
+  const { t } = useI18n();
   const [error, setError] = createSignal<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = createSignal(false);
 
@@ -15,7 +17,7 @@ export default function AccountSettings() {
       await logout();
       setCurrentUser(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to log out.");
+      setError(err instanceof ApiError ? err.message : t("account.logoutError"));
     }
   }
 
@@ -25,7 +27,7 @@ export default function AccountSettings() {
       await deleteAccount();
       setCurrentUser(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to delete account.");
+      setError(err instanceof ApiError ? err.message : t("account.deleteError"));
     }
   }
 
@@ -33,23 +35,23 @@ export default function AccountSettings() {
     <div class="d-account-settings account-settings">
       <Show when={user()}>{(currentUser) => <span>{currentUser().email}</span>}</Show>
       <button type="button" onClick={handleLogout}>
-        Log out
+        {t("account.logout")}
       </button>
 
       <Show
         when={confirmingDelete()}
         fallback={
           <button type="button" class="danger" onClick={() => setConfirmingDelete(true)}>
-            Delete account
+            {t("account.deleteAccount")}
           </button>
         }
       >
-        <span>Are you sure? This deletes your account and all todos.</span>
+        <span>{t("account.deleteConfirmation")}</span>
         <button type="button" class="danger" onClick={handleDeleteAccount}>
-          Confirm delete
+          {t("account.confirmDelete")}
         </button>
         <button type="button" onClick={() => setConfirmingDelete(false)}>
-          Cancel
+          {t("account.cancel")}
         </button>
       </Show>
 

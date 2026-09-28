@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSignal } from "solid-js";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, screen, waitFor } from "@solidjs/testing-library";
+import { renderWithI18n } from "../helpers/renderWithI18n";
 
 const mockedCreateTodo = vi.fn();
 const mockedToggleTodo = vi.fn();
@@ -34,30 +35,30 @@ beforeEach(() => {
 describe("TodoList", () => {
   it("shows a loading message while loading", () => {
     setMockedLoading(true);
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
     expect(screen.getByText("Loading todos…")).toBeInTheDocument();
   });
 
   it("shows a message when there are no todos", () => {
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
     expect(screen.getByText("No todos yet.")).toBeInTheDocument();
   });
 
   it("renders todos from the store", () => {
     mockedTodos = [{ id: "t1", title: "Buy milk", completed: false }];
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
     expect(screen.getByText("Buy milk")).toBeInTheDocument();
   });
 
   it("shows the error alert when the context reports an error", () => {
     mockedError = "Failed to load todos.";
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
     expect(screen.getByRole("alert")).toHaveTextContent("Failed to load todos.");
   });
 
   it("calls createTodo with the trimmed title and clears the input on success", async () => {
     mockedCreateTodo.mockResolvedValue(true);
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
 
     await fireEvent.input(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "  Buy milk  " },
@@ -70,7 +71,7 @@ describe("TodoList", () => {
 
   it("keeps the entered title when createTodo fails", async () => {
     mockedCreateTodo.mockResolvedValue(false);
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
 
     await fireEvent.input(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Buy milk" },
@@ -83,7 +84,7 @@ describe("TodoList", () => {
 
   it("calls toggleTodo when a todo's checkbox is clicked", async () => {
     mockedTodos = [{ id: "t1", title: "Buy milk", completed: false }];
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
 
     await fireEvent.click(screen.getByRole("checkbox"));
 
@@ -92,7 +93,7 @@ describe("TodoList", () => {
 
   it("calls deleteTodo when delete is clicked", async () => {
     mockedTodos = [{ id: "t1", title: "Buy milk", completed: false }];
-    render(() => <TodoList />);
+    renderWithI18n(() => <TodoList />);
 
     await fireEvent.click(screen.getByRole("button", { name: /delete/i }));
 
@@ -114,7 +115,7 @@ describe("TodoList", () => {
 
     it("is disabled while todos are loading", () => {
       setMockedLoading(true);
-      render(() => <TodoList />);
+      renderWithI18n(() => <TodoList />);
 
       expect(titleInput()).toBeDisabled();
       expect(addButton()).toBeDisabled();
@@ -123,7 +124,7 @@ describe("TodoList", () => {
 
     it("ignores a submit while todos are loading", async () => {
       setMockedLoading(true);
-      render(() => <TodoList />);
+      renderWithI18n(() => <TodoList />);
 
       await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
       await fireEvent.submit(form());
@@ -133,7 +134,7 @@ describe("TodoList", () => {
 
     it("is re-enabled once loading finishes, keeping any entered text", async () => {
       setMockedLoading(true);
-      render(() => <TodoList />);
+      renderWithI18n(() => <TodoList />);
       await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
 
       setMockedLoading(false);
@@ -147,7 +148,7 @@ describe("TodoList", () => {
     it("is disabled while a create is in flight and ignores repeat submits", async () => {
       const create = deferred<boolean>();
       mockedCreateTodo.mockReturnValue(create.promise);
-      render(() => <TodoList />);
+      renderWithI18n(() => <TodoList />);
 
       await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
       await fireEvent.click(addButton());
@@ -167,7 +168,7 @@ describe("TodoList", () => {
     it("is re-enabled with the title kept after a failed create", async () => {
       const create = deferred<boolean>();
       mockedCreateTodo.mockReturnValue(create.promise);
-      render(() => <TodoList />);
+      renderWithI18n(() => <TodoList />);
 
       await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
       await fireEvent.click(addButton());
