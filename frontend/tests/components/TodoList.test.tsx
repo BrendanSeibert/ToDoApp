@@ -1,46 +1,75 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 
-vi.mock("~/api/todos", () => ({
-  listTodos: vi.fn(),
-  createTodo: vi.fn(),
-  setCompleted: vi.fn(),
-  deleteTodo: vi.fn(),
+const mockedCreateTodo = vi.fn();
+const mockedToggleTodo = vi.fn();
+const mockedDeleteTodo = vi.fn();
+let mockedTodos: Array<{ id: string; title: string; completed: boolean }> = [];
+let mockedLoading = false;
+let mockedError: string | null = null;
+
+vi.mock("~/context/TodoContext", () => ({
+  useTodos: () => ({
+    todos: () => mockedTodos,
+    loading: () => mockedLoading,
+    error: () => mockedError,
+    createTodo: mockedCreateTodo,
+    toggleTodo: mockedToggleTodo,
+    deleteTodo: mockedDeleteTodo,
+  }),
 }));
 
-import { createTodo, deleteTodo, listTodos, setCompleted } from "~/api/todos";
 import TodoList from "~/components/TodoList";
 
-const mockedListTodos = listTodos as unknown as ReturnType<typeof vi.fn>;
-const mockedCreateTodo = createTodo as unknown as ReturnType<typeof vi.fn>;
-const mockedSetCompleted = setCompleted as unknown as ReturnType<typeof vi.fn>;
-const mockedDeleteTodo = deleteTodo as unknown as ReturnType<typeof vi.fn>;
-
 beforeEach(() => {
-  mockedListTodos.mockReset();
   mockedCreateTodo.mockReset();
-  mockedSetCompleted.mockReset();
+  mockedToggleTodo.mockReset();
   mockedDeleteTodo.mockReset();
+  mockedTodos = [];
+  mockedLoading = false;
+  mockedError = null;
 });
 
 describe("TodoList", () => {
-  it("shows a message when there are no todos", async () => {
-    mockedListTodos.mockResolvedValue([]);
+  it("shows a loading message while loading", () => {
+    mockedLoading = true;
     render(() => <TodoList />);
-    expect(await screen.findByText("No todos yet.")).toBeInTheDocument();
+    expect(screen.getByText("Loading todos…")).toBeInTheDocument();
   });
 
-  it("renders todos loaded on mount", async () => {
-    mockedListTodos.mockResolvedValue([{ id: "t1", title: "Buy milk", completed: false }]);
+  it("shows a message when there are no todos", () => {
     render(() => <TodoList />);
-    expect(await screen.findByText("Buy milk")).toBeInTheDocument();
+    expect(screen.getByText("No todos yet.")).toBeInTheDocument();
   });
 
-  it("adds a new todo", async () => {
-    mockedListTodos.mockResolvedValue([]);
-    mockedCreateTodo.mockResolvedValue({ id: "t1", title: "Buy milk", completed: false });
+  it("renders todos from the store", () => {
+    mockedTodos = [{ id: "t1", title: "Buy milk", completed: false }];
     render(() => <TodoList />);
-    await screen.findByText("No todos yet.");
+    expect(screen.getByText("Buy milk")).toBeInTheDocument();
+  });
+
+  it("shows the error alert when the context reports an error", () => {
+    mockedError = "Failed to load todos.";
+    render(() => <TodoList />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Failed to load todos.");
+  });
+
+  it("calls createTodo with the trimmed title and clears the input on success", async () => {
+    mockedCreateTodo.mockResolvedValue(true);
+    render(() => <TodoList />);
+
+    await fireEvent.input(screen.getByPlaceholderText("What needs doing?"), {
+      target: { value: "  Buy milk  " },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(mockedCreateTodo).toHaveBeenCalledWith("Buy milk");
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("");
+  });
+
+  it("keeps the entered title when createTodo fails", async () => {
+    mockedCreateTodo.mockResolvedValue(false);
+    render(() => <TodoList />);
 
     await fireEvent.input(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Buy milk" },
@@ -48,30 +77,24 @@ describe("TodoList", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(mockedCreateTodo).toHaveBeenCalledWith("Buy milk");
-    expect(await screen.findByText("Buy milk")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Buy milk");
   });
 
-  it("toggles a todo as completed", async () => {
-    mockedListTodos.mockResolvedValue([{ id: "t1", title: "Buy milk", completed: false }]);
-    mockedSetCompleted.mockResolvedValue({ id: "t1", title: "Buy milk", completed: true });
+  it("calls toggleTodo when a todo's checkbox is clicked", async () => {
+    mockedTodos = [{ id: "t1", title: "Buy milk", completed: false }];
     render(() => <TodoList />);
-    await screen.findByText("Buy milk");
 
     await fireEvent.click(screen.getByRole("checkbox"));
 
-    expect(mockedSetCompleted).toHaveBeenCalledWith("t1", true);
-    expect(await screen.findByRole("checkbox")).toBeChecked();
+    expect(mockedToggleTodo).toHaveBeenCalledWith("t1", true);
   });
 
-  it("deletes a todo", async () => {
-    mockedListTodos.mockResolvedValue([{ id: "t1", title: "Buy milk", completed: false }]);
-    mockedDeleteTodo.mockResolvedValue({ ok: true });
+  it("calls deleteTodo when delete is clicked", async () => {
+    mockedTodos = [{ id: "t1", title: "Buy milk", completed: false }];
     render(() => <TodoList />);
-    await screen.findByText("Buy milk");
 
     await fireEvent.click(screen.getByRole("button", { name: /delete/i }));
 
     expect(mockedDeleteTodo).toHaveBeenCalledWith("t1");
-    expect(await screen.findByText("No todos yet.")).toBeInTheDocument();
   });
 });

@@ -1,58 +1,27 @@
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import "./TodoList.scss";
-import { createTodo, deleteTodo, listTodos, setCompleted, type Todo } from "~/api/todos";
-import { ApiError } from "~/api/client";
+import { useTodos } from "~/context/TodoContext";
 import TodoItem from "./TodoItem";
 
 export default function TodoList() {
-  const [todos, setTodos] = createSignal<Todo[]>([]);
+  const { todos, loading, error, createTodo, toggleTodo, deleteTodo } = useTodos();
   const [newTitle, setNewTitle] = createSignal("");
-  const [loading, setLoading] = createSignal(true);
-  const [error, setError] = createSignal<string | null>(null);
-
-  async function refresh() {
-    try {
-      setTodos(await listTodos());
-      setError(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load todos.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  onMount(refresh);
 
   async function handleCreate(event: SubmitEvent) {
     event.preventDefault();
     const title = newTitle().trim();
     if (!title) return;
 
-    try {
-      const todo = await createTodo(title);
-      setTodos([...todos(), todo]);
-      setNewTitle("");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create todo.");
-    }
+    const created = await createTodo(title);
+    if (created) setNewTitle("");
   }
 
   async function handleToggle(id: string, completed: boolean) {
-    try {
-      const updated = await setCompleted(id, completed);
-      setTodos(todos().map((todo) => (todo.id === id ? updated : todo)));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to update todo.");
-    }
+    await toggleTodo(id, completed);
   }
 
   async function handleDelete(id: string) {
-    try {
-      await deleteTodo(id);
-      setTodos(todos().filter((todo) => todo.id !== id));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to delete todo.");
-    }
+    await deleteTodo(id);
   }
 
   return (
