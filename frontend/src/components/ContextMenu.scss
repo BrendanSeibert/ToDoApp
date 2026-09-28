@@ -1,0 +1,47 @@
+.d-context-menu {
+    --surface-color-context-menu: white;
+    --surface-color-context-menu-hover: #eeeeee;
+    --border-color-context-menu: #cccccc;
+    --text-color-context-menu: black;
+    --text-color-context-menu-disabled: #9a9a9a;
+}
+.context-menu {
+    position: relative;
+    display: inline-block;
+}
+.context-menu-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10;
+    box-sizing: border-box;
+    width: 60px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background-color: var(--surface-color-context-menu);
+    border: 1px solid var(--border-color-context-menu);
+}
+.context-menu-item {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 6px;
+    border: 0;
+    background-color: transparent;
+    color: var(--text-color-context-menu);
+    font: inherit;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        background-color: var(--surface-color-context-menu-hover);
+    }
+    &:disabled {
+        color: var(--text-color-context-menu-disabled);
+        cursor: not-allowed;
+    }
+}
