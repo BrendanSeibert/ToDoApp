@@ -5,16 +5,18 @@ vi.mock("~/api/auth", () => ({
   login: vi.fn(),
   register: vi.fn(),
 }));
-vi.mock("~/store/auth", () => ({ setCurrentUser: vi.fn() }));
+
+const mockedSetCurrentUser = vi.fn();
+vi.mock("~/context/AuthContext", () => ({
+  useAuth: () => ({ setCurrentUser: mockedSetCurrentUser }),
+}));
 
 import { login, register } from "~/api/auth";
 import { ApiError } from "~/api/client";
-import { setCurrentUser } from "~/store/auth";
 import AuthForms from "~/components/AuthForms";
 
 const mockedLogin = login as unknown as ReturnType<typeof vi.fn>;
 const mockedRegister = register as unknown as ReturnType<typeof vi.fn>;
-const mockedSetCurrentUser = setCurrentUser as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   mockedLogin.mockReset();

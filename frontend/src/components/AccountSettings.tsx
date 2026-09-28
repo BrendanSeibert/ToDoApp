@@ -1,14 +1,11 @@
 import { createSignal, Show } from "solid-js";
 import "./AccountSettings.scss";
-import { deleteAccount, logout, type User } from "~/api/auth";
+import { deleteAccount, logout } from "~/api/auth";
 import { ApiError } from "~/api/client";
-import { setCurrentUser } from "~/store/auth";
+import { useAuth } from "~/context/AuthContext";
 
-interface AccountSettingsProps {
-  user: User;
-}
-
-export default function AccountSettings(props: AccountSettingsProps) {
+export default function AccountSettings() {
+  const { user, setCurrentUser } = useAuth();
   const [error, setError] = createSignal<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = createSignal(false);
 
@@ -34,7 +31,7 @@ export default function AccountSettings(props: AccountSettingsProps) {
 
   return (
     <div class="d-account-settings account-settings">
-      <span>{props.user.email}</span>
+      <Show when={user()}>{(currentUser) => <span>{currentUser().email}</span>}</Show>
       <button type="button" onClick={handleLogout}>
         Log out
       </button>

@@ -2,9 +2,10 @@ import { createSignal, Show } from "solid-js";
 import "./AuthForms.scss";
 import { login, register } from "~/api/auth";
 import { ApiError } from "~/api/client";
-import { setCurrentUser } from "~/store/auth";
+import { useAuth } from "~/context/AuthContext";
 
 export default function AuthForms() {
+  const { setCurrentUser } = useAuth();
   const [mode, setMode] = createSignal<"login" | "register">("login");
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
