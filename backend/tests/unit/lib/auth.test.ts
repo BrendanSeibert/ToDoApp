@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  createSessionToken,
+  generateSessionToken,
   hashPassword,
+  hashSessionToken,
   verifyPassword,
-  verifySessionToken,
 } from "~/lib/auth";
 
 beforeEach(() => {
@@ -29,27 +29,30 @@ describe("password hashing", () => {
 });
 
 describe("session tokens", () => {
-  it("round-trips a valid token back to the same user id", () => {
-    const token = createSessionToken("user-123");
-    expect(verifySessionToken(token)).toBe("user-123");
+  it("generates distinct, URL-safe tokens with 256 bits of randomness", () => {
+    const tokens = new Set(Array.from({ length: 50 }, () => generateSessionToken()));
+    expect(tokens.size).toBe(50);
+    for (const token of tokens) {
+      expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    }
   });
 
-  it("rejects a tampered token", () => {
-    const token = createSessionToken("user-123");
-    const tampered = token.replace("user-123", "user-456");
-    expect(verifySessionToken(tampered)).toBeNull();
+  it("hashes a token deterministically without exposing it", () => {
+    const token = generateSessionToken();
+    expect(hashSessionToken(token)).toBe(hashSessionToken(token));
+    expect(hashSessionToken(token)).not.toContain(token);
+    expect(hashSessionToken(token)).not.toBe(hashSessionToken(generateSessionToken()));
   });
 
-  it("rejects a token signed with a different secret", () => {
-    const token = createSessionToken("user-123");
+  it("keys the hash with SESSION_SECRET, so rotating the secret changes every hash", () => {
+    const token = generateSessionToken();
+    const original = hashSessionToken(token);
     process.env.SESSION_SECRET = "a-different-secret";
-    expect(verifySessionToken(token)).toBeNull();
+    expect(hashSessionToken(token)).not.toBe(original);
   });
 
-  it("rejects malformed tokens", () => {
-    expect(verifySessionToken("not-a-valid-token")).toBeNull();
-    expect(verifySessionToken(null)).toBeNull();
-    expect(verifySessionToken(undefined)).toBeNull();
-    expect(verifySessionToken("")).toBeNull();
+  it("refuses to hash without a SESSION_SECRET", () => {
+    delete process.env.SESSION_SECRET;
+    expect(() => hashSessionToken("anything")).toThrow("SESSION_SECRET");
   });
 });

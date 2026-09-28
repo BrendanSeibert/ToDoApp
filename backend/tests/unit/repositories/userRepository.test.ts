@@ -51,7 +51,7 @@ describe("userRepository", () => {
     await expect(repo.findById("missing")).resolves.toBeNull();
   });
 
-  it("deleteUser issues a DETACH DELETE for the user and owned todos", async () => {
+  it("deleteUser issues a DETACH DELETE for the user, owned todos, and sessions", async () => {
     let capturedQuery = "";
     const driver = createMockDriver((query) => {
       capturedQuery = query;
@@ -61,5 +61,7 @@ describe("userRepository", () => {
     await repo.deleteUser("u1");
     expect(capturedQuery).toMatch(/DETACH DELETE/);
     expect(capturedQuery).toMatch(/OWNS/);
+    expect(capturedQuery).toMatch(/\[:HAS_SESSION\]->\(s:Session\)/);
+    expect(capturedQuery).toMatch(/DETACH DELETE u, t, s/);
   });
 });

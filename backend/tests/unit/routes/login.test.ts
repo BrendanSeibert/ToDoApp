@@ -1,4 +1,5 @@
 import "../helpers/vinxiHttpMock";
+import { createStoredSession, sessionStore } from "../helpers/sessionStoreMock";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockEvent } from "../helpers/mockEvent";
 
@@ -14,6 +15,7 @@ const mockedCreateUserRepository = createUserRepository as unknown as ReturnType
 
 beforeEach(() => {
   process.env.SESSION_SECRET = "unit-test-secret";
+  sessionStore.clear();
   mockedCreateUserRepository.mockReset();
 });
 
@@ -61,6 +63,33 @@ describe("POST /api/auth/login", () => {
       email: "a@example.com",
       createdAt: "2026-01-01T00:00:00.000Z",
     });
-    expect(getUserIdFromEvent(event)).toBe("u1");
+    await expect(getUserIdFromEvent(event)).resolves.toBe("u1");
+  });
+
+  it("does not create a session when login fails", async () => {
+    mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn().mockResolvedValue(null) });
+    const event = createMockEvent({ method: "POST", body: { email: "a@example.com", password: "whatever" } });
+    await POST(event);
+    expect(sessionStore.size).toBe(0);
+  });
+
+  it("replaces the session the browser already carried", async () => {
+    const passwordHash = await hashPassword("correct-password");
+    mockedCreateUserRepository.mockReturnValue({
+      findByEmail: vi.fn().mockResolvedValue({ id: "u1", email: "a@example.com", passwordHash, createdAt: "now" }),
+    });
+    const previous = createStoredSession("u1");
+    const event = createMockEvent({
+      method: "POST",
+      body: { email: "a@example.com", password: "correct-password" },
+      cookies: previous,
+    });
+
+    const response = await POST(event);
+
+    expect(response.status).toBe(200);
+    expect(sessionStore.size).toBe(1);
+    await expect(getUserIdFromEvent(createMockEvent({ cookies: previous }))).resolves.toBeNull();
+    await expect(getUserIdFromEvent(event)).resolves.toBe("u1");
   });
 });

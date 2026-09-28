@@ -1,7 +1,12 @@
-const BASE_URL = process.env.BACKEND_URL ?? "http://localhost:3000";
+import { BASE_URL } from "./backend";
 
 export class TestClient {
-  private cookie: string | undefined;
+  // Pass a cookie captured from another client to replay its session.
+  constructor(private cookie?: string) {}
+
+  get sessionCookie(): string | undefined {
+    return this.cookie;
+  }
 
   private async request(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);

@@ -56,7 +56,7 @@ npm test
 
 ### Backend integration tests (Docker)
 
-Runs the real backend against a real (throwaway) Neo4j instance in Docker, exercising the full register → login → create/complete/delete todo → delete account flow over HTTP:
+Runs the real backend against a real (throwaway) Neo4j instance in Docker, exercising the full register → login → create/complete/delete todo → delete account flow over HTTP, plus session behaviour (revocation on logout and account deletion, expiry):
 
 ```sh
 docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
@@ -95,6 +95,6 @@ The frontend dev server defaults to talking to `http://localhost:3000` unless yo
 
 See `.env.example` for the full list used by Docker Compose. Notably:
 
-- `SESSION_SECRET` — signs session cookies; changing it logs everyone out.
+- `SESSION_SECRET` — keys the hashes of session tokens stored in Neo4j; changing it logs everyone out. Sessions are stored server-side and expire after one day; logging out or deleting the account revokes them.
 - `FRONTEND_ORIGIN` — must match the origin the browser loads the frontend from, or the backend won't set CORS headers for it.
 - `VITE_API_URL` — baked into the frontend build at build time; the URL the browser uses to reach the backend.

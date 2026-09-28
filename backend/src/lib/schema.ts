@@ -15,6 +15,10 @@ export async function ensureConstraints(driver: Driver): Promise<void> {
       `CREATE CONSTRAINT todo_id_unique IF NOT EXISTS
        FOR (t:Todo) REQUIRE t.id IS UNIQUE`,
     );
+    await session.run(
+      `CREATE CONSTRAINT session_token_hash_unique IF NOT EXISTS
+       FOR (s:Session) REQUIRE s.tokenHash IS UNIQUE`,
+    );
   } finally {
     await session.close();
   }

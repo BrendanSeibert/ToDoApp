@@ -1,6 +1,6 @@
 import "../helpers/vinxiHttpMock";
+import { createStoredSession, sessionStore } from "../helpers/sessionStoreMock";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSessionToken } from "~/lib/auth";
 import { createMockEvent } from "../helpers/mockEvent";
 
 vi.mock("~/lib/neo4j", () => ({ getDriver: vi.fn(() => ({})) }));
@@ -9,13 +9,14 @@ vi.mock("~/lib/repositories/todoRepository", () => ({ createTodoRepository: vi.f
 import { createTodoRepository } from "~/lib/repositories/todoRepository";
 import { DELETE, PATCH } from "~/routes/api/todos/[id]";
 
-process.env.SESSION_SECRET = "unit-test-secret";
 
 const mockedCreateTodoRepository = createTodoRepository as unknown as ReturnType<typeof vi.fn>;
-const authCookie = { todo_session: createSessionToken("u1") };
+let authCookie: Record<string, string>;
 
 beforeEach(() => {
   process.env.SESSION_SECRET = "unit-test-secret";
+  sessionStore.clear();
+  authCookie = createStoredSession("u1");
   mockedCreateTodoRepository.mockReset();
 });
 

@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 
 export const SESSION_COOKIE_NAME = "todo_session";
 const BCRYPT_ROUNDS = 10;
+const SESSION_TOKEN_BYTES = 32;
 
 function getSessionSecret(): string {
   const secret = process.env.SESSION_SECRET;
@@ -23,29 +24,13 @@ export async function verifyPassword(
   return bcrypt.compare(plainPassword, passwordHash);
 }
 
-function sign(userId: string): string {
-  return createHmac("sha256", getSessionSecret()).update(userId).digest("hex");
+// The raw token only ever lives in the cookie; the database stores its hash.
+export function generateSessionToken(): string {
+  return randomBytes(SESSION_TOKEN_BYTES).toString("base64url");
 }
 
-export function createSessionToken(userId: string): string {
-  return `${userId}.${sign(userId)}`;
-}
-
-export function verifySessionToken(token: string | undefined | null): string | null {
-  if (!token) return null;
-
-  const separatorIndex = token.lastIndexOf(".");
-  if (separatorIndex === -1) return null;
-
-  const userId = token.slice(0, separatorIndex);
-  const providedSignature = token.slice(separatorIndex + 1);
-  const expectedSignature = sign(userId);
-
-  const providedBuffer = Buffer.from(providedSignature);
-  const expectedBuffer = Buffer.from(expectedSignature);
-
-  if (providedBuffer.length !== expectedBuffer.length) return null;
-  if (!timingSafeEqual(providedBuffer, expectedBuffer)) return null;
-
-  return userId;
+// Keyed with SESSION_SECRET so stored hashes are useless without the secret,
+// and rotating the secret invalidates every session.
+export function hashSessionToken(token: string): string {
+  return createHmac("sha256", getSessionSecret()).update(token).digest("hex");
 }

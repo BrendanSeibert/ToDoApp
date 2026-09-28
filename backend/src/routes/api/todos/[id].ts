@@ -6,7 +6,7 @@ import { errorResponse, json, ValidationError } from "~/lib/http";
 
 export async function PATCH(event: APIEvent): Promise<Response> {
   try {
-    const userId = requireUserId(event);
+    const userId = await requireUserId(event);
     const todoId = event.params.id;
     const body = await event.request.json().catch(() => null);
 
@@ -29,7 +29,7 @@ export async function PATCH(event: APIEvent): Promise<Response> {
 
 export async function DELETE(event: APIEvent): Promise<Response> {
   try {
-    const userId = requireUserId(event);
+    const userId = await requireUserId(event);
     const todoId = event.params.id;
 
     const todoRepository = createTodoRepository(getDriver());

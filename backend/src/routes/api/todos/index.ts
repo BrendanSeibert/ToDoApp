@@ -6,7 +6,7 @@ import { errorResponse, json, ValidationError } from "~/lib/http";
 
 export async function GET(event: APIEvent): Promise<Response> {
   try {
-    const userId = requireUserId(event);
+    const userId = await requireUserId(event);
     const todoRepository = createTodoRepository(getDriver());
     const todos = await todoRepository.listTodos(userId);
     return json({ todos }, 200, event);
@@ -17,7 +17,7 @@ export async function GET(event: APIEvent): Promise<Response> {
 
 export async function POST(event: APIEvent): Promise<Response> {
   try {
-    const userId = requireUserId(event);
+    const userId = await requireUserId(event);
     const body = await event.request.json().catch(() => null);
     const title = typeof body?.title === "string" ? body.title.trim() : "";
 

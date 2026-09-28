@@ -1,4 +1,5 @@
 import "../helpers/vinxiHttpMock";
+import { sessionStore } from "../helpers/sessionStoreMock";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockEvent } from "../helpers/mockEvent";
 
@@ -13,6 +14,7 @@ const mockedCreateUserRepository = createUserRepository as unknown as ReturnType
 
 beforeEach(() => {
   process.env.SESSION_SECRET = "unit-test-secret";
+  sessionStore.clear();
   mockedCreateUserRepository.mockReset();
 });
 
@@ -65,6 +67,6 @@ describe("POST /api/auth/register", () => {
       email: "a@example.com",
       createdAt: "2026-01-01T00:00:00.000Z",
     });
-    expect(getUserIdFromEvent(event)).toBe("u1");
+    await expect(getUserIdFromEvent(event)).resolves.toBe("u1");
   });
 });

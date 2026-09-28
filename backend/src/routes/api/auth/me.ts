@@ -6,7 +6,7 @@ import { errorResponse, json } from "~/lib/http";
 
 export async function GET(event: APIEvent): Promise<Response> {
   try {
-    const userId = requireUserId(event);
+    const userId = await requireUserId(event);
     const userRepository = createUserRepository(getDriver());
     const user = await userRepository.findById(userId);
 
@@ -23,7 +23,7 @@ export async function GET(event: APIEvent): Promise<Response> {
 
 export async function DELETE(event: APIEvent): Promise<Response> {
   try {
-    const userId = requireUserId(event);
+    const userId = await requireUserId(event);
     const userRepository = createUserRepository(getDriver());
     await userRepository.deleteUser(userId);
     clearSessionCookie(event);

@@ -61,7 +61,8 @@ export function createUserRepository(driver: Driver): UserRepository {
         await session.run(
           `MATCH (u:User {id: $id})
            OPTIONAL MATCH (u)-[:OWNS]->(t:Todo)
-           DETACH DELETE u, t`,
+           OPTIONAL MATCH (u)-[:HAS_SESSION]->(s:Session)
+           DETACH DELETE u, t, s`,
           { id },
         );
       } finally {

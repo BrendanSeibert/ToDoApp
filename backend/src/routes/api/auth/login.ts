@@ -2,7 +2,7 @@ import type { APIEvent } from "@solidjs/start/server";
 import { getDriver } from "~/lib/neo4j";
 import { createUserRepository } from "~/lib/repositories/userRepository";
 import { verifyPassword } from "~/lib/auth";
-import { setSessionCookie } from "~/lib/session";
+import { startSession } from "~/lib/session";
 import { AuthenticationError, errorResponse, json, ValidationError } from "~/lib/http";
 
 export async function POST(event: APIEvent): Promise<Response> {
@@ -22,7 +22,7 @@ export async function POST(event: APIEvent): Promise<Response> {
       throw new AuthenticationError("Invalid email or password");
     }
 
-    setSessionCookie(event, user.id);
+    await startSession(event, user.id);
 
     return json({ id: user.id, email: user.email, createdAt: user.createdAt }, 200, event);
   } catch (error) {
