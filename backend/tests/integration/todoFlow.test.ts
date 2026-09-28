@@ -95,4 +95,21 @@ describe("end-to-end account and todo lifecycle", () => {
 
     await client.delete("/api/auth/me");
   });
+
+  it("rejects the loser of a concurrent registration for the same email with a 400, not a 500", async () => {
+    const email = uniqueEmail("race");
+    const clients = [new TestClient(), new TestClient()];
+
+    // Both pass the "email already taken" pre-check before either finishes hashing and inserting.
+    const responses = await Promise.all(
+      clients.map((client) => client.post("/api/auth/register", { email, password: testPassword })),
+    );
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 400]);
+    const loser = responses.find((response) => response.status === 400)!;
+    expect((await loser.json()).error).toBe("An account with this email already exists");
+
+    const winner = clients[responses.findIndex((response) => response.status === 201)];
+    await winner.delete("/api/auth/me");
+  });
 });

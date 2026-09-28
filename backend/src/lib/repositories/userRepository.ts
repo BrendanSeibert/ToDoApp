@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
-import type { Driver } from "neo4j-driver";
+import { Neo4jError, type Driver } from "neo4j-driver";
+
+const CONSTRAINT_VIOLATION_CODE = "Neo.ClientError.Schema.ConstraintValidationFailed";
 
 export interface User {
   id: string;
@@ -8,7 +10,21 @@ export interface User {
   createdAt: string;
 }
 
+export class EmailAlreadyExistsError extends Error {
+  constructor() {
+    super("A user with this email already exists");
+  }
+}
+
+// Only the email constraint: a violation on User.id would be a genuine bug, not a duplicate signup.
+function isEmailConstraintViolation(error: unknown): boolean {
+  return (
+    error instanceof Neo4jError && error.code === CONSTRAINT_VIOLATION_CODE && error.message.includes("`email`")
+  );
+}
+
 export interface UserRepository {
+  // Throws EmailAlreadyExistsError if the email is taken.
   createUser(email: string, passwordHash: string): Promise<User>;
   findByEmail(email: string): Promise<User | null>;
   findById(id: string): Promise<User | null>;
@@ -28,6 +44,9 @@ export function createUserRepository(driver: Driver): UserRepository {
           { id, email, passwordHash, createdAt },
         );
         return result.records[0].get("u").properties as User;
+      } catch (error) {
+        if (isEmailConstraintViolation(error)) throw new EmailAlreadyExistsError();
+        throw error;
       } finally {
         await session.close();
       }

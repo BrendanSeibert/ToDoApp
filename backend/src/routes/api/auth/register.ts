@@ -1,11 +1,12 @@
 import type { APIEvent } from "@solidjs/start/server";
 import { getDriver } from "~/lib/neo4j";
-import { createUserRepository } from "~/lib/repositories/userRepository";
+import { createUserRepository, EmailAlreadyExistsError } from "~/lib/repositories/userRepository";
 import { hashPassword } from "~/lib/auth";
 import { startSession } from "~/lib/session";
 import { errorResponse, json, ValidationError } from "~/lib/http";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_TAKEN_MESSAGE = "An account with this email already exists";
 
 export async function POST(event: APIEvent): Promise<Response> {
   try {
@@ -24,11 +25,15 @@ export async function POST(event: APIEvent): Promise<Response> {
 
     const existing = await userRepository.findByEmail(email);
     if (existing) {
-      throw new ValidationError("An account with this email already exists");
+      throw new ValidationError(EMAIL_TAKEN_MESSAGE);
     }
 
     const passwordHash = await hashPassword(password);
-    const user = await userRepository.createUser(email, passwordHash);
+    // The check above is only a fast path: a concurrent registration can still win the race
+    // before this insert, in which case the database's uniqueness constraint rejects it.
+    const user = await userRepository.createUser(email, passwordHash).catch((error) => {
+      throw error instanceof EmailAlreadyExistsError ? new ValidationError(EMAIL_TAKEN_MESSAGE) : error;
+    });
 
     await startSession(event, user.id);
 

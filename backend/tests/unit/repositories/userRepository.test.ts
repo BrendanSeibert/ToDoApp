@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createUserRepository } from "~/lib/repositories/userRepository";
+import { Neo4jError } from "neo4j-driver";
+import { createUserRepository, EmailAlreadyExistsError } from "~/lib/repositories/userRepository";
 import { createMockDriver, fakeRecord } from "../helpers/mockDriver";
+
+// The driver's constructor also wants GQL status fields, which these tests don't care about.
+const neo4jError = (message: string, code: string) => new Neo4jError(message, code, "50N42", "error: general processing exception");
 
 describe("userRepository", () => {
   it("createUser returns the created user's properties", async () => {
@@ -28,6 +32,48 @@ describe("userRepository", () => {
     expect(user.email).toBe("a@example.com");
     expect(user.passwordHash).toBe("hash");
     expect(typeof user.id).toBe("string");
+  });
+
+  describe("createUser constraint violations", () => {
+    const CONSTRAINT_CODE = "Neo.ClientError.Schema.ConstraintValidationFailed";
+    const rejectingDriver = (error: Error) =>
+      createMockDriver(() => {
+        throw error;
+      });
+
+    it("throws EmailAlreadyExistsError when the email uniqueness constraint fails", async () => {
+      const driver = rejectingDriver(
+        neo4jError("Node(1) already exists with label `User` and property `email` = 'a@example.com'", CONSTRAINT_CODE),
+      );
+
+      await expect(createUserRepository(driver).createUser("a@example.com", "hash")).rejects.toBeInstanceOf(
+        EmailAlreadyExistsError,
+      );
+    });
+
+    it("rethrows a constraint violation on a different property", async () => {
+      const error = neo4jError("Node(1) already exists with label `User` and property `id` = 'x'", CONSTRAINT_CODE);
+
+      await expect(createUserRepository(rejectingDriver(error)).createUser("a@example.com", "hash")).rejects.toBe(
+        error,
+      );
+    });
+
+    it("rethrows other database errors unchanged", async () => {
+      const error = neo4jError("Connection refused", "ServiceUnavailable");
+
+      await expect(createUserRepository(rejectingDriver(error)).createUser("a@example.com", "hash")).rejects.toBe(
+        error,
+      );
+    });
+
+    it("closes the session when the create fails", async () => {
+      const driver = rejectingDriver(neo4jError("`email`", CONSTRAINT_CODE));
+
+      await createUserRepository(driver).createUser("a@example.com", "hash").catch(() => undefined);
+
+      expect(driver.session().close).toHaveBeenCalled();
+    });
   });
 
   it("findByEmail returns null when no user matches", async () => {

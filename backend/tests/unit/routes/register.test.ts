@@ -4,9 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockEvent } from "../helpers/mockEvent";
 
 vi.mock("~/lib/neo4j", () => ({ getDriver: vi.fn(() => ({})) }));
-vi.mock("~/lib/repositories/userRepository", () => ({ createUserRepository: vi.fn() }));
+vi.mock("~/lib/repositories/userRepository", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/lib/repositories/userRepository")>()),
+  createUserRepository: vi.fn(),
+}));
 
-import { createUserRepository } from "~/lib/repositories/userRepository";
+import { createUserRepository, EmailAlreadyExistsError } from "~/lib/repositories/userRepository";
 import { getUserIdFromEvent } from "~/lib/session";
 import { POST } from "~/routes/api/auth/register";
 
@@ -44,6 +47,35 @@ describe("POST /api/auth/register", () => {
     await expect(response.json()).resolves.toEqual({
       error: "An account with this email already exists",
     });
+  });
+
+  it("rejects with the same 400 when a concurrent registration wins the race to create the user", async () => {
+    mockedCreateUserRepository.mockReturnValue({
+      findByEmail: vi.fn().mockResolvedValue(null),
+      createUser: vi.fn().mockRejectedValue(new EmailAlreadyExistsError()),
+    });
+    const event = createMockEvent({ method: "POST", body: { email: "a@example.com", password: "longenough" } });
+
+    const response = await POST(event);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "An account with this email already exists",
+    });
+    await expect(getUserIdFromEvent(event)).resolves.toBeNull();
+  });
+
+  it("still returns a 500 for an unexpected createUser failure", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockedCreateUserRepository.mockReturnValue({
+      findByEmail: vi.fn().mockResolvedValue(null),
+      createUser: vi.fn().mockRejectedValue(new Error("connection lost")),
+    });
+    const event = createMockEvent({ method: "POST", body: { email: "a@example.com", password: "longenough" } });
+
+    const response = await POST(event);
+
+    expect(response.status).toBe(500);
   });
 
   it("creates the account, sets a session cookie, and returns the user", async () => {
