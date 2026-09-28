@@ -1,17 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 
 const mockedCreateTodo = vi.fn();
 const mockedToggleTodo = vi.fn();
 const mockedDeleteTodo = vi.fn();
 let mockedTodos: Array<{ id: string; title: string; completed: boolean }> = [];
-let mockedLoading = false;
+const [mockedLoading, setMockedLoading] = createSignal(false);
 let mockedError: string | null = null;
 
 vi.mock("~/context/TodoContext", () => ({
   useTodos: () => ({
     todos: () => mockedTodos,
-    loading: () => mockedLoading,
+    loading: mockedLoading,
     error: () => mockedError,
     createTodo: mockedCreateTodo,
     toggleTodo: mockedToggleTodo,
@@ -26,13 +27,13 @@ beforeEach(() => {
   mockedToggleTodo.mockReset();
   mockedDeleteTodo.mockReset();
   mockedTodos = [];
-  mockedLoading = false;
+  setMockedLoading(false);
   mockedError = null;
 });
 
 describe("TodoList", () => {
   it("shows a loading message while loading", () => {
-    mockedLoading = true;
+    setMockedLoading(true);
     render(() => <TodoList />);
     expect(screen.getByText("Loading todos…")).toBeInTheDocument();
   });
@@ -96,5 +97,86 @@ describe("TodoList", () => {
     await fireEvent.click(screen.getByRole("button", { name: /delete/i }));
 
     expect(mockedDeleteTodo).toHaveBeenCalledWith("t1");
+  });
+
+  describe("add form", () => {
+    const titleInput = () => screen.getByPlaceholderText("What needs doing?");
+    const addButton = () => screen.getByRole("button", { name: "Add" });
+    const form = () => addButton().closest("form")!;
+
+    function deferred<T>() {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((res) => {
+        resolve = res;
+      });
+      return { promise, resolve };
+    }
+
+    it("is disabled while todos are loading", () => {
+      setMockedLoading(true);
+      render(() => <TodoList />);
+
+      expect(titleInput()).toBeDisabled();
+      expect(addButton()).toBeDisabled();
+      expect(form()).toHaveAttribute("aria-busy", "true");
+    });
+
+    it("ignores a submit while todos are loading", async () => {
+      setMockedLoading(true);
+      render(() => <TodoList />);
+
+      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+      await fireEvent.submit(form());
+
+      expect(mockedCreateTodo).not.toHaveBeenCalled();
+    });
+
+    it("is re-enabled once loading finishes, keeping any entered text", async () => {
+      setMockedLoading(true);
+      render(() => <TodoList />);
+      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+
+      setMockedLoading(false);
+
+      expect(titleInput()).toBeEnabled();
+      expect(addButton()).toBeEnabled();
+      expect(form()).toHaveAttribute("aria-busy", "false");
+      expect(titleInput()).toHaveValue("Buy milk");
+    });
+
+    it("is disabled while a create is in flight and ignores repeat submits", async () => {
+      const create = deferred<boolean>();
+      mockedCreateTodo.mockReturnValue(create.promise);
+      render(() => <TodoList />);
+
+      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+      await fireEvent.click(addButton());
+
+      expect(titleInput()).toBeDisabled();
+      expect(addButton()).toBeDisabled();
+
+      await fireEvent.submit(form());
+      expect(mockedCreateTodo).toHaveBeenCalledTimes(1);
+
+      create.resolve(true);
+
+      await waitFor(() => expect(titleInput()).toBeEnabled());
+      expect(titleInput()).toHaveValue("");
+    });
+
+    it("is re-enabled with the title kept after a failed create", async () => {
+      const create = deferred<boolean>();
+      mockedCreateTodo.mockReturnValue(create.promise);
+      render(() => <TodoList />);
+
+      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+      await fireEvent.click(addButton());
+      expect(addButton()).toBeDisabled();
+
+      create.resolve(false);
+
+      await waitFor(() => expect(addButton()).toBeEnabled());
+      expect(titleInput()).toHaveValue("Buy milk");
+    });
   });
 });
