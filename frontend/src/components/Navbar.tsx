@@ -7,8 +7,12 @@ export default function Navbar() {
 
   return (
     <header class="d-navbar navbar todo-header">
-      <h1>{t("navbar.todos")}</h1>
-      <AccountSettings />
+      <div class="nav-group-left">
+        <h1>{t("navbar.todos")}</h1>
+      </div>
+      <div class="nav-group-right">
+        <AccountSettings />
+      </div>
     </header>
   );
 }

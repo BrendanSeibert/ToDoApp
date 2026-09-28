@@ -1,0 +1,10 @@
+.d-navbar{
+    --text-color-header: black;
+    --surface-color-navbar: white;
+}
+.navbar{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--surface-color-navbar);
+}

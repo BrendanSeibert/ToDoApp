@@ -89,7 +89,21 @@ npm install
 npm run dev
 ```
 
-The frontend dev server defaults to talking to `http://localhost:3000` unless you set `VITE_API_URL`.
+The frontend dev server defaults to talking to `http://localhost:3000` (where `npm run dev` serves the backend) unless you set `VITE_API_URL`.
+
+### Pointing the dev server at a different backend
+
+If the backend is running in Docker instead (e.g. `docker compose up -d backend`), it is published on port 3001, so a bare `npm run dev` gets `ERR_CONNECTION_REFUSED` on login/register. `npm run dev` doesn't read the root `.env` that Docker Compose uses, so set the URL in a frontend-only file:
+
+```sh
+cd frontend
+cp .env.local.example .env.local   # adjust VITE_API_URL if your backend port differs
+npm run dev                        # restart if it was already running; Vite reads env files at startup
+```
+
+`frontend/.env.local` is git-ignored and Docker-ignored, so it only affects local `npm run dev` and never the Docker build. Docker builds get `VITE_API_URL` from the root `.env` instead.
+
+Both the Docker frontend and the Vite dev server use port 5173 by default, so stop the container first with `docker compose stop frontend`.
 
 ## Environment variables
 
@@ -97,4 +111,4 @@ See `.env.example` for the full list used by Docker Compose. Notably:
 
 - `SESSION_SECRET` — keys the hashes of session tokens stored in Neo4j; changing it logs everyone out. Sessions are stored server-side and expire after one day; logging out or deleting the account revokes them.
 - `FRONTEND_ORIGIN` — must match the origin the browser loads the frontend from, or the backend won't set CORS headers for it.
-- `VITE_API_URL` — baked into the frontend build at build time; the URL the browser uses to reach the backend.
+- `VITE_API_URL` — baked into the frontend build at build time; the URL the browser uses to reach the backend. For `npm run dev`, set it in `frontend/.env.local` instead (see `frontend/.env.local.example`).
