@@ -14,6 +14,13 @@ export default function App() {
     document.title = t("app.title");
   });
 
+  // Keeps <html lang> matching the active dictionary (WCAG 3.1.1). A dictionary without
+  // "app.lang" leaves the current value alone rather than writing the key into the attribute.
+  createEffect(() => {
+    const lang = t("app.lang");
+    if (lang !== "app.lang") document.documentElement.lang = lang;
+  });
+
   onMount(async () => {
     try {
       setCurrentUser(await getMe());
@@ -26,7 +33,14 @@ export default function App() {
 
   return (
     <div class="d-app app">
-      <Show when={!initializing()} fallback={<p>{t("app.loading")}</p>}>
+      <Show
+        when={!initializing()}
+        fallback={
+          <main>
+            <p>{t("app.loading")}</p>
+          </main>
+        }
+      >
         <Show when={user()} fallback={<AuthForms />}>
           <TodoApp />
         </Show>

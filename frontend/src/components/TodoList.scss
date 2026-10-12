@@ -9,7 +9,7 @@
   --surface-color-todo-list-field-disabled: #{p.$grey-50};
   --border-color-todo-list-field: #{p.$grey-300};
   --border-color-todo-list-field-focus: #{p.$grey-900};
-  --text-color-todo-list-placeholder: #{p.$grey-500};
+  --text-color-todo-list-placeholder: #{p.$grey-600};
   --text-color-todo-list-add: #{p.$black};
   --text-color-todo-list-add-hover: #{p.$grey-600};
   --text-color-todo-list-add-disabled: #{p.$grey-500};
@@ -23,7 +23,6 @@
 .todo-list {
   color: var(--text-color-todo-list);
 
-  // The fieldset below is display: contents, so the input and add button are this row flex items.
   form {
     display: flex;
     align-items: center;
@@ -32,10 +31,27 @@
     border-bottom: 1px solid var(--border-color-todo-list);
   }
 
-  input[type="text"] {
-    @include t.field-shape;
+  // Kept for screen readers; the placeholder does the visible work.
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .new-todo-field {
+    display: flex;
     flex: 1;
     min-width: 0;
+  }
+
+  input[type="text"] {
+    @include t.field-shape;
     background-color: var(--surface-color-todo-list-field);
     border-color: var(--border-color-todo-list-field);
     color: var(--text-color-todo-list);
@@ -89,14 +105,5 @@
     background-color: var(--surface-color-todo-list-error);
     border-left-color: var(--border-color-todo-list-error);
     color: var(--text-color-todo-list-error);
-  }
-
-  // Only used to disable the add form controls as a group; keep it out of the layout.
-  fieldset {
-    display: contents;
-    border: 0;
-    margin: 0;
-    padding: 0;
-    min-width: 0;
   }
 }

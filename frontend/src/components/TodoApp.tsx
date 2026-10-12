@@ -6,7 +6,9 @@ export default function TodoApp() {
   return (
     <div class="d-todo-app todo-app">
       <Navbar />
-      <TodoList />
+      <main>
+        <TodoList />
+      </main>
     </div>
   );
 }

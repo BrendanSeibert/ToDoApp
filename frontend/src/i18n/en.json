@@ -1,5 +1,6 @@
 {
   "app": {
+    "lang": "en",
     "title": "Todo List",
     "loading": "Loading…"
   },
@@ -31,6 +32,7 @@
     "deleteError": "Failed to delete account."
   },
   "todos": {
+    "label": "New todo",
     "placeholder": "What needs doing?",
     "add": "Add",
     "loading": "Loading todos…",

@@ -30,7 +30,7 @@ export default function AuthForms() {
   }
 
   return (
-    <div class="d-auth-forms auth-forms">
+    <main class="d-auth-forms auth-forms">
       <h1>{mode() === "login" ? t("auth.login.heading") : t("auth.register.heading")}</h1>
 
       <form onSubmit={handleSubmit}>
@@ -78,6 +78,6 @@ export default function AuthForms() {
       >
         {mode() === "login" ? t("auth.login.switchToRegister") : t("auth.register.switchToLogin")}
       </button>
-    </div>
+    </main>
   );
 }

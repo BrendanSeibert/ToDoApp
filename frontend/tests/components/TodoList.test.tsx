@@ -56,6 +56,11 @@ describe("TodoList", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Failed to load todos.");
   });
 
+  it("labels the new todo input for assistive technology", () => {
+    renderWithI18n(() => <TodoList />);
+    expect(screen.getByLabelText("New todo")).toBe(screen.getByPlaceholderText("What needs doing?"));
+  });
+
   it("calls createTodo with the trimmed title and clears the input on success", async () => {
     mockedCreateTodo.mockResolvedValue(true);
     renderWithI18n(() => <TodoList />);

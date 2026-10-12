@@ -11,7 +11,8 @@ export default function TodoList() {
   const [newTitle, setNewTitle] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
   // Adding during the initial fetch would be overwritten when it lands; adding while a
-  // create is in flight would duplicate it.
+  // create is in flight would duplicate it. Applied to each form control, so any control added
+  // to the form needs `disabled={formDisabled()}` too.
   const formDisabled = () => loading() || submitting();
 
   async function handleCreate(event: SubmitEvent) {
@@ -40,17 +41,25 @@ export default function TodoList() {
   return (
     <section class="d-todo-list todo-list">
       <form onSubmit={handleCreate} aria-busy={formDisabled()}>
-        <fieldset disabled={formDisabled()}>
+        <label class="new-todo-field">
+          <span class="visually-hidden">{t("todos.label")}</span>
           <input
             type="text"
             placeholder={t("todos.placeholder")}
             value={newTitle()}
+            disabled={formDisabled()}
             onInput={(e) => setNewTitle(e.currentTarget.value)}
           />
-          <button type="submit" class="add-button" title={t("todos.add")} aria-label={t("todos.add")}>
-            <MdFillAdd_box size={21.33} aria-hidden="true" />
-          </button>
-        </fieldset>
+        </label>
+        <button
+          type="submit"
+          class="add-button"
+          title={t("todos.add")}
+          aria-label={t("todos.add")}
+          disabled={formDisabled()}
+        >
+          <MdFillAdd_box size={21.33} aria-hidden="true" />
+        </button>
       </form>
 
       <Show when={error()}>
