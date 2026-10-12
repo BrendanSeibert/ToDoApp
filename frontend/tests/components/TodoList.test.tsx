@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSignal } from "solid-js";
 import { fireEvent, screen, waitFor } from "@solidjs/testing-library";
 import { renderWithI18n } from "../helpers/renderWithI18n";
@@ -137,17 +137,15 @@ describe("TodoList", () => {
       expect(mockedCreateTodo).not.toHaveBeenCalled();
     });
 
-    it("is re-enabled once loading finishes, keeping any entered text", async () => {
+    it("re-enables the input and the button once loading finishes", () => {
       setMockedLoading(true);
       renderWithI18n(() => <TodoList />);
-      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
 
       setMockedLoading(false);
 
       expect(titleInput()).toBeEnabled();
       expect(addButton()).toBeEnabled();
       expect(form()).toHaveAttribute("aria-busy", "false");
-      expect(titleInput()).toHaveValue("Buy milk");
     });
 
     it("is disabled while a create is in flight and ignores repeat submits", async () => {
@@ -168,6 +166,103 @@ describe("TodoList", () => {
 
       await waitFor(() => expect(titleInput()).toBeEnabled());
       expect(titleInput()).toHaveValue("");
+    });
+
+    describe("empty title message", () => {
+      const message = () => screen.queryByText("Enter a todo item");
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("keeps the add button clickable and shows a message instead of creating an empty todo", async () => {
+        renderWithI18n(() => <TodoList />);
+
+        expect(addButton()).toBeEnabled();
+        await fireEvent.click(addButton());
+
+        expect(message()).toBeInTheDocument();
+        expect(screen.getByRole("alert")).toHaveTextContent("Enter a todo item");
+        expect(mockedCreateTodo).not.toHaveBeenCalled();
+      });
+
+      it("shows the message and creates nothing for whitespace-only input", async () => {
+        renderWithI18n(() => <TodoList />);
+
+        await fireEvent.input(titleInput(), { target: { value: "   " } });
+        await fireEvent.click(addButton());
+
+        expect(message()).toBeInTheDocument();
+        expect(mockedCreateTodo).not.toHaveBeenCalled();
+      });
+
+      it("shows the message when the form is submitted with Enter on an empty input", async () => {
+        renderWithI18n(() => <TodoList />);
+
+        await fireEvent.submit(form());
+
+        expect(message()).toBeInTheDocument();
+        expect(mockedCreateTodo).not.toHaveBeenCalled();
+      });
+
+      it("links the message to the input while it shows", async () => {
+        renderWithI18n(() => <TodoList />);
+
+        await fireEvent.click(addButton());
+
+        expect(titleInput()).toHaveAttribute("aria-invalid", "true");
+        expect(titleInput()).toHaveAccessibleDescription("Enter a todo item");
+      });
+
+      it("hides the message as soon as the user types", async () => {
+        renderWithI18n(() => <TodoList />);
+        await fireEvent.click(addButton());
+        expect(message()).toBeInTheDocument();
+
+        await fireEvent.input(titleInput(), { target: { value: "B" } });
+
+        expect(message()).not.toBeInTheDocument();
+        expect(titleInput()).toHaveAttribute("aria-invalid", "false");
+      });
+
+      it("hides the message after 15 seconds", async () => {
+        vi.useFakeTimers();
+        renderWithI18n(() => <TodoList />);
+        await fireEvent.click(addButton());
+
+        vi.advanceTimersByTime(14_999);
+        expect(message()).toBeInTheDocument();
+
+        vi.advanceTimersByTime(1);
+        expect(message()).not.toBeInTheDocument();
+      });
+
+      it("restarts the 15 seconds when the button is clicked again", async () => {
+        vi.useFakeTimers();
+        renderWithI18n(() => <TodoList />);
+        await fireEvent.click(addButton());
+
+        vi.advanceTimersByTime(10_000);
+        await fireEvent.click(addButton());
+        vi.advanceTimersByTime(10_000);
+        expect(message()).toBeInTheDocument();
+
+        vi.advanceTimersByTime(5_000);
+        expect(message()).not.toBeInTheDocument();
+      });
+
+      it("hides the message and creates the todo on a valid submit", async () => {
+        mockedCreateTodo.mockResolvedValue(true);
+        renderWithI18n(() => <TodoList />);
+        await fireEvent.click(addButton());
+        expect(message()).toBeInTheDocument();
+
+        await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+        await fireEvent.click(addButton());
+
+        expect(message()).not.toBeInTheDocument();
+        expect(mockedCreateTodo).toHaveBeenCalledWith("Buy milk");
+      });
     });
 
     it("is re-enabled with the title kept after a failed create", async () => {

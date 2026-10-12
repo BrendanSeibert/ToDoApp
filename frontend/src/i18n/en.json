@@ -35,6 +35,7 @@
     "label": "New todo",
     "placeholder": "What needs doing?",
     "add": "Add",
+    "titleRequired": "Enter a todo item",
     "loading": "Loading todos…",
     "empty": "No todos yet."
   },

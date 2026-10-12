@@ -16,6 +16,7 @@
   --surface-color-todo-list-add: #{p.$transparent};
   --border-color-todo-list-add: #{p.$transparent};
   --border-color-todo-list-add-hover: #{p.$grey-300};
+  --border-color-todo-list-add-disabled: #{p.$transparent};
   --text-color-todo-list-error: #{p.$red-700};
   --surface-color-todo-list-error: #{p.$red-50};
   --border-color-todo-list-error: #{p.$red-600};
@@ -28,7 +29,6 @@
     align-items: center;
     gap: t.$space-2;
     padding: t.$space-4 t.$space-5;
-    border-bottom: 1px solid var(--border-color-todo-list);
   }
 
   // Kept for screen readers; the placeholder does the visible work.
@@ -80,8 +80,10 @@
       color: var(--text-color-todo-list-add-hover);
       border-color: var(--border-color-todo-list-add-hover);
     }
+    // Declared after the hover rule so a disabled button never shows the outline.
     &:disabled {
       color: var(--text-color-todo-list-add-disabled);
+      border-color: var(--border-color-todo-list-add-disabled);
     }
   }
 
@@ -99,9 +101,17 @@
     text-align: center;
   }
 
+  // The divider sits above whatever follows the input area, not under the form itself, so any
+  // message rendered below the form reads as part of the input area rather than as a row.
+  > ul,
+  > p:not(.error) {
+    border-top: 1px solid var(--border-color-todo-list);
+  }
+
+  // Sits directly under the form, which already supplies the space above it.
   .error {
     @include t.message-shape;
-    margin: t.$space-4 t.$space-5 0;
+    margin: 0 t.$space-5 t.$space-4;
     background-color: var(--surface-color-todo-list-error);
     border-left-color: var(--border-color-todo-list-error);
     color: var(--text-color-todo-list-error);
