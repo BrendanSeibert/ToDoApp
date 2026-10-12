@@ -3,6 +3,7 @@
 .d-todo-item {
     --text-color-todo-item: #{p.$black};
     --text-color-todo-item-completed: #{p.$black};
+    --surface-color-todo-item-bullet: #{p.$black};
     --text-color-todo-item-delete: #{p.$black};
     --text-color-todo-item-delete-hover: #{p.$grey-600};
     --surface-color-todo-item-delete: #{p.$transparent};
@@ -10,7 +11,28 @@
     --border-color-todo-item-delete-hover: #{p.$grey-300};
 }
 .todo-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    // The bullet is drawn by ::before below, since a flex <li> has no native marker.
+    list-style: none;
     color: var(--text-color-todo-item);
+
+    &::before {
+        content: "";
+        flex-shrink: 0;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: var(--surface-color-todo-item-bullet);
+    }
+
+    label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+    }
 
     .completed {
         color: var(--text-color-todo-item-completed);
