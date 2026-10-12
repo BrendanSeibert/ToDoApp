@@ -1,3 +1,4 @@
+import { TiDelete } from "solid-icons/ti";
 import type { Todo } from "~/api/todos";
 import { useI18n } from "~/context/I18nContext";
 import "./TodoItem.scss";
@@ -23,10 +24,12 @@ export default function TodoItem(props: TodoItemProps) {
       </label>
       <button
         type="button"
+        class="delete-button"
+        title={t("todoItem.delete")}
         aria-label={t("todoItem.deleteAria", { title: props.todo.title })}
         onClick={() => props.onDelete(props.todo.id)}
       >
-        {t("todoItem.delete")}
+        <TiDelete size={24} aria-hidden="true" />
       </button>
     </li>
   );

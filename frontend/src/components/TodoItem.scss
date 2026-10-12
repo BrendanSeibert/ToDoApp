@@ -3,11 +3,34 @@
 .d-todo-item {
     --text-color-todo-item: #{p.$black};
     --text-color-todo-item-completed: #{p.$black};
+    --text-color-todo-item-delete: #{p.$black};
+    --text-color-todo-item-delete-hover: #{p.$grey-600};
+    --surface-color-todo-item-delete: #{p.$transparent};
+    --border-color-todo-item-delete: #{p.$transparent};
+    --border-color-todo-item-delete-hover: #{p.$grey-300};
 }
 .todo-item {
     color: var(--text-color-todo-item);
 
     .completed {
         color: var(--text-color-todo-item-completed);
+    }
+
+    .delete-button {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px;
+        border: 1px solid var(--border-color-todo-item-delete);
+        border-radius: 4px;
+        background-color: var(--surface-color-todo-item-delete);
+        color: var(--text-color-todo-item-delete);
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+
+        &:hover,
+        &:focus-visible {
+            color: var(--text-color-todo-item-delete-hover);
+            border-color: var(--border-color-todo-item-delete-hover);
+        }
     }
 }

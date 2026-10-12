@@ -44,6 +44,6 @@ describe("TodoItem", () => {
       </I18nProvider>
     ));
 
-    expect(screen.getByRole("button", { name: "Buy milk löschen" })).toHaveTextContent("Löschen");
+    expect(screen.getByRole("button", { name: "Buy milk löschen" })).toHaveAttribute("title", "Löschen");
   });
 });
