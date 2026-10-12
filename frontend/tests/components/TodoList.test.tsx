@@ -36,12 +36,12 @@ describe("TodoList", () => {
   it("shows a loading message while loading", () => {
     setMockedLoading(true);
     renderWithI18n(() => <TodoList />);
-    expect(screen.getByText("Loading todos…")).toBeInTheDocument();
+    expect(screen.getByText("Loading to-dos…")).toBeInTheDocument();
   });
 
   it("shows a message when there are no todos", () => {
     renderWithI18n(() => <TodoList />);
-    expect(screen.getByText("No todos yet.")).toBeInTheDocument();
+    expect(screen.getByText("No to-dos yet.")).toBeInTheDocument();
   });
 
   it("renders todos from the store", () => {
@@ -51,14 +51,14 @@ describe("TodoList", () => {
   });
 
   it("shows the error alert when the context reports an error", () => {
-    mockedError = "Failed to load todos.";
+    mockedError = "Failed to load to-dos.";
     renderWithI18n(() => <TodoList />);
-    expect(screen.getByRole("alert")).toHaveTextContent("Failed to load todos.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Failed to load to-dos.");
   });
 
   it("labels the new todo input for assistive technology", () => {
     renderWithI18n(() => <TodoList />);
-    expect(screen.getByLabelText("New todo")).toBe(screen.getByPlaceholderText("What needs doing?"));
+    expect(screen.getByLabelText("New to-do")).toBe(screen.getByPlaceholderText("What needs doing?"));
   });
 
   it("calls createTodo with the trimmed title and clears the input on success", async () => {
@@ -169,7 +169,7 @@ describe("TodoList", () => {
     });
 
     describe("empty title message", () => {
-      const message = () => screen.queryByText("Enter a todo item");
+      const message = () => screen.queryByText("Enter a to-do item");
 
       afterEach(() => {
         vi.useRealTimers();
@@ -182,7 +182,7 @@ describe("TodoList", () => {
         await fireEvent.click(addButton());
 
         expect(message()).toBeInTheDocument();
-        expect(screen.getByRole("alert")).toHaveTextContent("Enter a todo item");
+        expect(screen.getByRole("alert")).toHaveTextContent("Enter a to-do item");
         expect(mockedCreateTodo).not.toHaveBeenCalled();
       });
 
@@ -211,7 +211,7 @@ describe("TodoList", () => {
         await fireEvent.click(addButton());
 
         expect(titleInput()).toHaveAttribute("aria-invalid", "true");
-        expect(titleInput()).toHaveAccessibleDescription("Enter a todo item");
+        expect(titleInput()).toHaveAccessibleDescription("Enter a to-do item");
       });
 
       it("hides the message as soon as the user types", async () => {

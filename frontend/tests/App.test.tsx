@@ -55,7 +55,7 @@ describe("App document title", () => {
   it("sets the document title from the dictionary", () => {
     renderApp();
 
-    expect(document.title).toBe("Todo List");
+    expect(document.title).toBe("To-Do List");
   });
 
   it("updates the document title when the dictionary changes", async () => {

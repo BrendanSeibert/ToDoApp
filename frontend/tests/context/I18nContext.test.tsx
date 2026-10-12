@@ -28,7 +28,7 @@ describe("I18nContext", () => {
       </I18nProvider>
     ));
 
-    expect(screen.getByTestId("plain")).toHaveTextContent("Todos");
+    expect(screen.getByTestId("plain")).toHaveTextContent("To-Dos");
     expect(screen.getByTestId("interpolated")).toHaveTextContent("Delete Buy milk");
   });
 

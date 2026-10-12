@@ -147,7 +147,7 @@ describe("TodoProvider", () => {
 
     setMockUser(loggedInUser);
 
-    expect(await screen.findByText("Failed to load todos.")).toBeInTheDocument();
+    expect(await screen.findByText("Failed to load to-dos.")).toBeInTheDocument();
   });
 
   it("adds the todo to the store only after the backend call succeeds", async () => {
@@ -172,7 +172,7 @@ describe("TodoProvider", () => {
     await fireEvent.click(screen.getByRole("button", { name: "create" }));
     create.reject(new Error("boom"));
 
-    expect(await screen.findByText("Failed to create todo.")).toBeInTheDocument();
+    expect(await screen.findByText("Failed to create to-do.")).toBeInTheDocument();
     expect(screen.queryByText(/New todo/)).not.toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe("TodoProvider", () => {
 
     update.reject(new Error("boom"));
 
-    expect(await screen.findByText("Failed to update todo.")).toBeInTheDocument();
+    expect(await screen.findByText("Failed to update to-do.")).toBeInTheDocument();
     expect(screen.getByText("t1:Buy milk:false")).toBeInTheDocument();
   });
 
@@ -227,7 +227,7 @@ describe("TodoProvider", () => {
     await fireEvent.click(screen.getByRole("button", { name: "delete" }));
     remove.reject(new Error("boom"));
 
-    expect(await screen.findByText("Failed to delete todo.")).toBeInTheDocument();
+    expect(await screen.findByText("Failed to delete to-do.")).toBeInTheDocument();
     expect(screen.getByText("t1:Buy milk:false")).toBeInTheDocument();
   });
 
@@ -335,7 +335,7 @@ describe("TodoProvider", () => {
     mockedListTodos.mockRejectedValue(new Error("boom"));
     renderProvider();
     setMockUser(loggedInUser);
-    await screen.findByText("Failed to load todos.");
+    await screen.findByText("Failed to load to-dos.");
 
     setMockUser(null);
 
@@ -348,7 +348,7 @@ describe("TodoProvider", () => {
     renderProvider();
     setMockUser(loggedInUser);
     await fireEvent.click(screen.getByRole("button", { name: "create" }));
-    await screen.findByText("Failed to create todo.");
+    await screen.findByText("Failed to create to-do.");
 
     setMockUser(null);
 

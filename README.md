@@ -1,4 +1,4 @@
-# Todo List App
+# To-Do List App
 
 A full-stack todo list app: a [SolidStart](https://start.solidjs.com/) backend API, a [Neo4j](https://neo4j.com/) database, and a [SolidJS](https://www.solidjs.com/) frontend.
 

@@ -1,11 +1,11 @@
 {
   "app": {
     "lang": "en",
-    "title": "Todo List",
+    "title": "To-Do List",
     "loading": "Loading…"
   },
   "navbar": {
-    "todos": "Todos"
+    "todos": "To-Dos"
   },
   "auth": {
     "email": "Email",
@@ -25,28 +25,28 @@
   "account": {
     "logout": "Log out",
     "deleteAccount": "Delete account",
-    "deleteConfirmation": "Are you sure? This deletes your account and all todos.",
+    "deleteConfirmation": "Are you sure? This deletes your account and all to-dos.",
     "confirmDelete": "Confirm delete",
     "cancel": "Cancel",
     "logoutError": "Failed to log out.",
     "deleteError": "Failed to delete account."
   },
   "todos": {
-    "label": "New todo",
+    "label": "New to-do",
     "placeholder": "What needs doing?",
     "add": "Add",
-    "titleRequired": "Enter a todo item",
-    "loading": "Loading todos…",
-    "empty": "No todos yet."
+    "titleRequired": "Enter a to-do item",
+    "loading": "Loading to-dos…",
+    "empty": "No to-dos yet."
   },
   "todoItem": {
     "delete": "Delete",
     "deleteAria": "Delete {title}"
   },
   "errors": {
-    "loadTodos": "Failed to load todos.",
-    "createTodo": "Failed to create todo.",
-    "updateTodo": "Failed to update todo.",
-    "deleteTodo": "Failed to delete todo."
+    "loadTodos": "Failed to load to-dos.",
+    "createTodo": "Failed to create to-do.",
+    "updateTodo": "Failed to update to-do.",
+    "deleteTodo": "Failed to delete to-do."
   }
 }
