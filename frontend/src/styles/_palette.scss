@@ -2,8 +2,18 @@
 // Components pull from here inside their `.d-<name>` block; the roles live there.
 $white: #ffffff;
 $black: #000000;
+$grey-50: #f6f6f6;
+$grey-100: #e5e5e5;
 $grey-200: #eeeeee;
 $grey-300: #cccccc;
 $grey-500: #9a9a9a;
 $grey-600: #666666;
+$grey-800: #333333;
+$grey-900: #1a1a1a;
+$shadow: rgba(0, 0, 0, 0.08);
 $transparent: transparent;
+
+// Muted red, reserved for danger and error states only.
+$red-50: #fbeceb;
+$red-600: #b3261e;
+$red-700: #8f1f19;

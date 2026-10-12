@@ -1,40 +1,63 @@
 @use "../styles/palette" as p;
+@use "../styles/tokens" as t;
 
 .d-todo-list {
-  --text-color-todo-list: #{p.$black};
-  --text-color-todo-list-error: #{p.$black};
+  --text-color-todo-list: #{p.$grey-900};
+  --text-color-todo-list-muted: #{p.$grey-600};
+  --border-color-todo-list: #{p.$grey-100};
+  --surface-color-todo-list-field: #{p.$white};
+  --surface-color-todo-list-field-disabled: #{p.$grey-50};
+  --border-color-todo-list-field: #{p.$grey-300};
+  --border-color-todo-list-field-focus: #{p.$grey-900};
+  --text-color-todo-list-placeholder: #{p.$grey-500};
   --text-color-todo-list-add: #{p.$black};
   --text-color-todo-list-add-hover: #{p.$grey-600};
   --text-color-todo-list-add-disabled: #{p.$grey-500};
   --surface-color-todo-list-add: #{p.$transparent};
   --border-color-todo-list-add: #{p.$transparent};
   --border-color-todo-list-add-hover: #{p.$grey-300};
+  --text-color-todo-list-error: #{p.$red-700};
+  --surface-color-todo-list-error: #{p.$red-50};
+  --border-color-todo-list-error: #{p.$red-600};
 }
 .todo-list {
   color: var(--text-color-todo-list);
 
-  .error {
-    color: var(--text-color-todo-list-error);
-  }
-
-  // The fieldset below is display: contents, so the input and add button are this row's flex items.
+  // The fieldset below is display: contents, so the input and add button are this row flex items.
   form {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: t.$space-2;
+    padding: t.$space-4 t.$space-5;
+    border-bottom: 1px solid var(--border-color-todo-list);
+  }
+
+  input[type="text"] {
+    @include t.field-shape;
+    flex: 1;
+    min-width: 0;
+    background-color: var(--surface-color-todo-list-field);
+    border-color: var(--border-color-todo-list-field);
+    color: var(--text-color-todo-list);
+
+    &::placeholder {
+      color: var(--text-color-todo-list-placeholder);
+    }
+    &:focus {
+      border-color: var(--border-color-todo-list-field-focus);
+    }
+    &:disabled {
+      background-color: var(--surface-color-todo-list-field-disabled);
+    }
   }
 
   // The Material box glyph fills 18/24 of its viewBox, so a 21.33px svg draws a 16px box.
   .add-button {
-    display: inline-flex;
-    align-items: center;
-    padding: 3.33px;
-    border: 1px solid var(--border-color-todo-list-add);
-    border-radius: 4px;
+    @include t.icon-button-shape(3.33px);
+    flex-shrink: 0;
     background-color: var(--surface-color-todo-list-add);
+    border-color: var(--border-color-todo-list-add);
     color: var(--text-color-todo-list-add);
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
 
     &:hover:not(:disabled),
     &:focus-visible {
@@ -43,11 +66,32 @@
     }
     &:disabled {
       color: var(--text-color-todo-list-add-disabled);
-      cursor: not-allowed;
     }
   }
 
-  // Only used to disable the add form's controls as a group; keep it out of the layout.
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  // Loading and empty states.
+  p:not(.error) {
+    margin: 0;
+    padding: t.$space-5;
+    color: var(--text-color-todo-list-muted);
+    text-align: center;
+  }
+
+  .error {
+    @include t.message-shape;
+    margin: t.$space-4 t.$space-5 0;
+    background-color: var(--surface-color-todo-list-error);
+    border-left-color: var(--border-color-todo-list-error);
+    color: var(--text-color-todo-list-error);
+  }
+
+  // Only used to disable the add form controls as a group; keep it out of the layout.
   fieldset {
     display: contents;
     border: 0;

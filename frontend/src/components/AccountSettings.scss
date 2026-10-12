@@ -1,17 +1,72 @@
 @use "../styles/palette" as p;
+@use "../styles/tokens" as t;
 
 .d-account-settings {
-    --text-color-account-settings: #{p.$black};
-    --text-color-account-settings-danger: #{p.$black};
-    --text-color-account-settings-error: #{p.$black};
+    --text-color-account-settings: #{p.$grey-900};
+    --text-color-account-settings-muted: #{p.$grey-600};
+    --surface-color-account-settings-button: #{p.$white};
+    --surface-color-account-settings-button-hover: #{p.$grey-50};
+    --border-color-account-settings-button: #{p.$grey-300};
+    --text-color-account-settings-danger: #{p.$red-600};
+    --border-color-account-settings-danger: #{p.$red-600};
+    --surface-color-account-settings-danger-hover: #{p.$red-50};
+    --text-color-account-settings-confirm: #{p.$white};
+    --surface-color-account-settings-confirm: #{p.$red-600};
+    --surface-color-account-settings-confirm-hover: #{p.$red-700};
+    --text-color-account-settings-error: #{p.$red-700};
+    --surface-color-account-settings-error: #{p.$red-50};
+    --border-color-account-settings-error: #{p.$red-600};
 }
 .account-settings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: t.$space-2;
+    font-size: t.$font-size-sm;
     color: var(--text-color-account-settings);
 
-    .danger {
-        color: var(--text-color-account-settings-danger);
+    .account-email {
+        color: var(--text-color-account-settings-muted);
     }
+
+    // Secondary (ghost) look for every button; .danger and .confirm override it below.
+    button {
+        @include t.button-shape-small;
+        background-color: var(--surface-color-account-settings-button);
+        border-color: var(--border-color-account-settings-button);
+        color: var(--text-color-account-settings);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-color-account-settings-button-hover);
+        }
+    }
+
+    .danger {
+        border-color: var(--border-color-account-settings-danger);
+        color: var(--text-color-account-settings-danger);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-color-account-settings-danger-hover);
+        }
+    }
+
+    .confirm {
+        background-color: var(--surface-color-account-settings-confirm);
+        border-color: var(--surface-color-account-settings-confirm);
+        color: var(--text-color-account-settings-confirm);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-color-account-settings-confirm-hover);
+        }
+    }
+
     .error {
+        @include t.message-shape;
+        flex-basis: 100%;
+        background-color: var(--surface-color-account-settings-error);
+        border-left-color: var(--border-color-account-settings-error);
         color: var(--text-color-account-settings-error);
+        text-align: left;
     }
 }

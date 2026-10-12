@@ -1,0 +1,97 @@
+// Shared non-colour design tokens and shape mixins. Colours stay in the palette and in
+// each component's `.d-<name>` block; mixins here set shape only and leave colour to the caller.
+$font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+$font-size-sm: 0.875rem;
+$font-size-md: 1rem;
+$font-size-lg: 1.25rem;
+$font-size-xl: 1.5rem;
+$line-height: 1.5;
+
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 24px;
+$space-6: 32px;
+
+$radius-sm: 4px;
+$radius-md: 6px;
+$radius-lg: 12px;
+
+$content-width: 640px;
+$auth-width: 360px;
+
+$transition: 0.15s ease;
+
+@mixin transitions {
+    transition:
+        color $transition,
+        background-color $transition,
+        border-color $transition;
+}
+
+// A text button. The caller sets background-color, border-color and color.
+@mixin button-shape {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-2;
+    padding: $space-2 $space-4;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: $radius-md;
+    font: inherit;
+    font-weight: 500;
+    line-height: 1.25;
+    cursor: pointer;
+    @include transitions;
+
+    &:disabled {
+        cursor: not-allowed;
+    }
+}
+
+@mixin button-shape-small {
+    @include button-shape;
+    padding: $space-1 $space-3;
+    font-size: $font-size-sm;
+}
+
+// A button holding only an svg icon.
+@mixin icon-button-shape($padding) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: $padding;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    @include transitions;
+
+    &:disabled {
+        cursor: not-allowed;
+    }
+}
+
+@mixin field-shape {
+    box-sizing: border-box;
+    width: 100%;
+    padding: $space-2 $space-3;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: $radius-md;
+    font: inherit;
+    line-height: 1.25;
+    @include transitions;
+}
+
+// The red-tinted block used for error messages.
+@mixin message-shape {
+    margin: 0;
+    padding: $space-2 $space-3;
+    border-left-width: 3px;
+    border-left-style: solid;
+    border-radius: $radius-sm;
+    font-size: $font-size-sm;
+}

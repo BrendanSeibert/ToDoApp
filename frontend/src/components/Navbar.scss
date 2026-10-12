@@ -1,16 +1,25 @@
 @use "../styles/palette" as p;
+@use "../styles/tokens" as t;
 
 .d-navbar{
-    --text-color-header: #{p.$black};
+    --text-color-header: #{p.$grey-900};
     --surface-color-navbar: #{p.$white};
+    --border-color-navbar: #{p.$grey-100};
 }
 .navbar{
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: t.$space-4;
+    padding: t.$space-3 t.$space-5;
     background-color: var(--surface-color-navbar);
+    border-bottom: 1px solid var(--border-color-navbar);
 
     h1 {
+        margin: 0;
+        font-size: t.$font-size-lg;
+        font-weight: 700;
+        letter-spacing: -0.01em;
         color: var(--text-color-header);
     }
 }

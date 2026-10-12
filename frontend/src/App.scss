@@ -1,10 +1,48 @@
 @use "./styles/palette" as p;
+@use "./styles/tokens" as t;
 
 .d-app {
-    --surface-color-app: #{p.$white};
-    --text-color-app: #{p.$black};
+    --surface-color-app: #{p.$grey-50};
+    --text-color-app: #{p.$grey-900};
+    --border-color-app-focus: #{p.$grey-900};
 }
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: t.$font-family;
+    font-size: t.$font-size-md;
+    line-height: t.$line-height;
+}
+
 .app {
+    min-height: 100vh;
+    padding: t.$space-6 t.$space-4;
     background-color: var(--surface-color-app);
     color: var(--text-color-app);
+
+    :focus-visible {
+        outline: 2px solid var(--border-color-app-focus);
+        outline-offset: 2px;
+    }
+}
+
+// Centres whichever screen is showing (auth card, todo card, loading text).
+// :where keeps this at zero specificity so a component can set its own width.
+:where(.app) > * {
+    max-width: t.$content-width;
+    margin-inline: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.01ms !important;
+    }
 }

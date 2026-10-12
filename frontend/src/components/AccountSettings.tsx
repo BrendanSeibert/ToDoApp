@@ -33,7 +33,7 @@ export default function AccountSettings() {
 
   return (
     <div class="d-account-settings account-settings">
-      <Show when={user()}>{(currentUser) => <span>{currentUser().email}</span>}</Show>
+      <Show when={user()}>{(currentUser) => <span class="account-email">{currentUser().email}</span>}</Show>
       <button type="button" onClick={handleLogout}>
         {t("account.logout")}
       </button>
@@ -47,7 +47,7 @@ export default function AccountSettings() {
         }
       >
         <span>{t("account.deleteConfirmation")}</span>
-        <button type="button" class="danger" onClick={handleDeleteAccount}>
+        <button type="button" class="danger confirm" onClick={handleDeleteAccount}>
           {t("account.confirmDelete")}
         </button>
         <button type="button" onClick={() => setConfirmingDelete(false)}>

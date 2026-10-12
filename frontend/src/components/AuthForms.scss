@@ -1,17 +1,106 @@
 @use "../styles/palette" as p;
+@use "../styles/tokens" as t;
 
 .d-auth-forms {
-    --text-color-auth-forms: #{p.$black};
-    --text-color-auth-forms-link-button: #{p.$black};
-    --text-color-auth-forms-error: #{p.$black};
+    --text-color-auth-forms: #{p.$grey-900};
+    --surface-color-auth-forms: #{p.$white};
+    --border-color-auth-forms: #{p.$grey-100};
+    --shadow-color-auth-forms: #{p.$shadow};
+    --surface-color-auth-forms-field: #{p.$white};
+    --border-color-auth-forms-field: #{p.$grey-300};
+    --border-color-auth-forms-field-focus: #{p.$grey-900};
+    --text-color-auth-forms-primary: #{p.$white};
+    --surface-color-auth-forms-primary: #{p.$black};
+    --surface-color-auth-forms-primary-hover: #{p.$grey-800};
+    --surface-color-auth-forms-primary-disabled: #{p.$grey-500};
+    --text-color-auth-forms-link-button: #{p.$grey-600};
+    --text-color-auth-forms-link-button-hover: #{p.$grey-900};
+    --text-color-auth-forms-error: #{p.$red-700};
+    --surface-color-auth-forms-error: #{p.$red-50};
+    --border-color-auth-forms-error: #{p.$red-600};
 }
 .auth-forms {
+    width: 100%;
+    max-width: t.$auth-width;
+    margin: t.$space-6 auto 0;
+    padding: t.$space-5;
+    background-color: var(--surface-color-auth-forms);
+    border: 1px solid var(--border-color-auth-forms);
+    border-radius: t.$radius-lg;
+    box-shadow: 0 1px 3px var(--shadow-color-auth-forms);
     color: var(--text-color-auth-forms);
 
-    .link-button {
-        color: var(--text-color-auth-forms-link-button);
+    h1 {
+        margin: 0 0 t.$space-4;
+        font-size: t.$font-size-xl;
+        font-weight: 700;
+        letter-spacing: -0.01em;
     }
+
+    form {
+        display: flex;
+        flex-direction: column;
+        gap: t.$space-4;
+    }
+
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: t.$space-1;
+        font-size: t.$font-size-sm;
+        font-weight: 500;
+    }
+
+    input {
+        @include t.field-shape;
+        background-color: var(--surface-color-auth-forms-field);
+        border-color: var(--border-color-auth-forms-field);
+        color: var(--text-color-auth-forms);
+
+        &:focus {
+            border-color: var(--border-color-auth-forms-field-focus);
+        }
+    }
+
+    button[type="submit"] {
+        @include t.button-shape;
+        width: 100%;
+        background-color: var(--surface-color-auth-forms-primary);
+        border-color: var(--surface-color-auth-forms-primary);
+        color: var(--text-color-auth-forms-primary);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-color-auth-forms-primary-hover);
+            border-color: var(--surface-color-auth-forms-primary-hover);
+        }
+        &:disabled {
+            background-color: var(--surface-color-auth-forms-primary-disabled);
+            border-color: var(--surface-color-auth-forms-primary-disabled);
+        }
+    }
+
+    .link-button {
+        display: block;
+        margin: t.$space-4 auto 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: t.$font-size-sm;
+        color: var(--text-color-auth-forms-link-button);
+        text-decoration: underline;
+        cursor: pointer;
+        @include t.transitions;
+
+        &:hover {
+            color: var(--text-color-auth-forms-link-button-hover);
+        }
+    }
+
     .error {
+        @include t.message-shape;
+        background-color: var(--surface-color-auth-forms-error);
+        border-left-color: var(--border-color-auth-forms-error);
         color: var(--text-color-auth-forms-error);
     }
 }

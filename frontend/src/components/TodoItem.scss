@@ -1,43 +1,48 @@
 @use "../styles/palette" as p;
+@use "../styles/tokens" as t;
 
 .d-todo-item {
-    --text-color-todo-item: #{p.$black};
-    --text-color-todo-item-completed: #{p.$black};
-    --surface-color-todo-item-bullet: #{p.$black};
+    --text-color-todo-item: #{p.$grey-900};
+    --text-color-todo-item-completed: #{p.$grey-500};
+    --surface-color-todo-item-hover: #{p.$grey-50};
+    --border-color-todo-item: #{p.$grey-100};
     --text-color-todo-item-checkbox: #{p.$black};
     --text-color-todo-item-checkbox-hover: #{p.$grey-600};
     --border-color-todo-item-checkbox: #{p.$transparent};
     --border-color-todo-item-checkbox-hover: #{p.$grey-300};
     --text-color-todo-item-delete: #{p.$black};
-    --text-color-todo-item-delete-hover: #{p.$grey-600};
+    --text-color-todo-item-delete-hover: #{p.$red-600};
     --surface-color-todo-item-delete: #{p.$transparent};
+    --surface-color-todo-item-delete-hover: #{p.$red-50};
     --border-color-todo-item-delete: #{p.$transparent};
-    --border-color-todo-item-delete-hover: #{p.$grey-300};
+    --border-color-todo-item-delete-hover: #{p.$red-600};
 }
 .todo-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    // The bullet is drawn by ::before below, since a flex <li> has no native marker.
+    gap: t.$space-3;
+    padding: t.$space-2 t.$space-5;
+    border-bottom: 1px solid var(--border-color-todo-item);
     list-style: none;
     color: var(--text-color-todo-item);
+    transition: background-color t.$transition;
 
-    &::before {
-        content: "";
-        flex-shrink: 0;
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background-color: var(--surface-color-todo-item-bullet);
+    &:last-child {
+        border-bottom: 0;
+    }
+    &:hover {
+        background-color: var(--surface-color-todo-item-hover);
     }
 
     label {
         position: relative;
         display: flex;
+        flex: 1;
         align-items: center;
-        gap: 4px;
+        gap: t.$space-2;
         min-width: 0;
         cursor: pointer;
+        overflow-wrap: anywhere;
 
         &:hover .checkbox-icon,
         .checkbox-input:focus-visible + .checkbox-icon {
@@ -57,33 +62,29 @@
     }
 
     // The Material box glyph fills 18/24 of its viewBox, so a 21.33px svg draws a 16px box;
-    // the extra padding keeps the overall button at the same 30px.
+    // the extra padding keeps the overall button at 30px.
     .checkbox-icon {
-        display: inline-flex;
-        padding: 3.33px;
-        border: 1px solid var(--border-color-todo-item-checkbox);
-        border-radius: 4px;
+        @include t.icon-button-shape(3.33px);
+        flex-shrink: 0;
+        border-color: var(--border-color-todo-item-checkbox);
         color: var(--text-color-todo-item-checkbox);
-        transition: color 0.15s, border-color 0.15s;
     }
 
     .completed {
         color: var(--text-color-todo-item-completed);
+        text-decoration: line-through;
     }
 
     .delete-button {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px;
-        border: 1px solid var(--border-color-todo-item-delete);
-        border-radius: 4px;
+        @include t.icon-button-shape(2px);
+        flex-shrink: 0;
         background-color: var(--surface-color-todo-item-delete);
+        border-color: var(--border-color-todo-item-delete);
         color: var(--text-color-todo-item-delete);
-        cursor: pointer;
-        transition: color 0.15s, border-color 0.15s;
 
         &:hover,
         &:focus-visible {
+            background-color: var(--surface-color-todo-item-delete-hover);
             color: var(--text-color-todo-item-delete-hover);
             border-color: var(--border-color-todo-item-delete-hover);
         }

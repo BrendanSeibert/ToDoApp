@@ -1,8 +1,17 @@
 @use "../styles/palette" as p;
+@use "../styles/tokens" as t;
 
 .d-todo-app{
-    --text-color-todo-app: #{p.$black};
+    --text-color-todo-app: #{p.$grey-900};
+    --surface-color-todo-app: #{p.$white};
+    --border-color-todo-app: #{p.$grey-100};
+    --shadow-color-todo-app: #{p.$shadow};
 }
 .todo-app{
+    overflow: hidden;
+    background-color: var(--surface-color-todo-app);
+    border: 1px solid var(--border-color-todo-app);
+    border-radius: t.$radius-lg;
+    box-shadow: 0 1px 3px var(--shadow-color-todo-app);
     color: var(--text-color-todo-app);
 }
