@@ -1,0 +1,7 @@
+// Central colour palette. Raw values only, named by colour rather than by use.
+// Components pull from here inside their `.d-<name>` block; the roles live there.
+$white: #ffffff;
+$black: #000000;
+$grey-200: #eeeeee;
+$grey-300: #cccccc;
+$grey-500: #9a9a9a;
