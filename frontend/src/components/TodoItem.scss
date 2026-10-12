@@ -1,0 +1,13 @@
+@use "../styles/palette" as p;
+
+.d-todo-item {
+    --text-color-todo-item: #{p.$black};
+    --text-color-todo-item-completed: #{p.$black};
+}
+.todo-item {
+    color: var(--text-color-todo-item);
+
+    .completed {
+        color: var(--text-color-todo-item-completed);
+    }
+}

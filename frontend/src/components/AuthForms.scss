@@ -1,0 +1,17 @@
+@use "../styles/palette" as p;
+
+.d-auth-forms {
+    --text-color-auth-forms: #{p.$black};
+    --text-color-auth-forms-link-button: #{p.$black};
+    --text-color-auth-forms-error: #{p.$black};
+}
+.auth-forms {
+    color: var(--text-color-auth-forms);
+
+    .link-button {
+        color: var(--text-color-auth-forms-link-button);
+    }
+    .error {
+        color: var(--text-color-auth-forms-error);
+    }
+}

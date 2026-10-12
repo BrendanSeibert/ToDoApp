@@ -1,10 +1,16 @@
+@use "../styles/palette" as p;
+
 .d-navbar{
-    --text-color-header: black;
-    --surface-color-navbar: white;
+    --text-color-header: #{p.$black};
+    --surface-color-navbar: #{p.$white};
 }
 .navbar{
     display: flex;
     justify-content: space-between;
     align-items: center;
     background-color: var(--surface-color-navbar);
+
+    h1 {
+        color: var(--text-color-header);
+    }
 }

@@ -1,3 +1,8 @@
+@use "../styles/palette" as p;
+
 .d-todo-app{
-    --text-color-one: #000000;
+    --text-color-todo-app: #{p.$black};
+}
+.todo-app{
+    color: var(--text-color-todo-app);
 }

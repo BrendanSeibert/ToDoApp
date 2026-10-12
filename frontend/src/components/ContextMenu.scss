@@ -1,9 +1,11 @@
+@use "../styles/palette" as p;
+
 .d-context-menu {
-    --surface-color-context-menu: white;
-    --surface-color-context-menu-hover: #eeeeee;
-    --border-color-context-menu: #cccccc;
-    --text-color-context-menu: black;
-    --text-color-context-menu-disabled: #9a9a9a;
+    --surface-color-context-menu: #{p.$white};
+    --surface-color-context-menu-hover: #{p.$grey-200};
+    --border-color-context-menu: #{p.$grey-300};
+    --text-color-context-menu: #{p.$black};
+    --text-color-context-menu-disabled: #{p.$grey-500};
 }
 .context-menu {
     position: relative;

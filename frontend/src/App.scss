@@ -1,0 +1,10 @@
+@use "./styles/palette" as p;
+
+.d-app {
+    --surface-color-app: #{p.$white};
+    --text-color-app: #{p.$black};
+}
+.app {
+    background-color: var(--surface-color-app);
+    color: var(--text-color-app);
+}

@@ -1,0 +1,17 @@
+@use "../styles/palette" as p;
+
+.d-account-settings {
+    --text-color-account-settings: #{p.$black};
+    --text-color-account-settings-danger: #{p.$black};
+    --text-color-account-settings-error: #{p.$black};
+}
+.account-settings {
+    color: var(--text-color-account-settings);
+
+    .danger {
+        color: var(--text-color-account-settings-danger);
+    }
+    .error {
+        color: var(--text-color-account-settings-error);
+    }
+}

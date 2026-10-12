@@ -25,10 +25,12 @@ export default function App() {
   });
 
   return (
-    <Show when={!initializing()} fallback={<p>{t("app.loading")}</p>}>
-      <Show when={user()} fallback={<AuthForms />}>
-        <TodoApp />
+    <div class="d-app app">
+      <Show when={!initializing()} fallback={<p>{t("app.loading")}</p>}>
+        <Show when={user()} fallback={<AuthForms />}>
+          <TodoApp />
+        </Show>
       </Show>
-    </Show>
+    </div>
   );
 }
