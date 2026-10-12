@@ -1,3 +1,5 @@
+import { Show } from "solid-js";
+import { MdFillCheck_box, MdFillCheck_box_outline_blank } from "solid-icons/md";
 import { TiDelete } from "solid-icons/ti";
 import type { Todo } from "~/api/todos";
 import { useI18n } from "~/context/I18nContext";
@@ -17,9 +19,15 @@ export default function TodoItem(props: TodoItemProps) {
       <label>
         <input
           type="checkbox"
+          class="checkbox-input"
           checked={props.todo.completed}
           onChange={(e) => props.onToggle(props.todo.id, e.currentTarget.checked)}
         />
+        <span class="checkbox-icon" aria-hidden="true">
+          <Show when={props.todo.completed} fallback={<MdFillCheck_box_outline_blank size={21.33} />}>
+            <MdFillCheck_box size={21.33} />
+          </Show>
+        </span>
         <span classList={{ completed: props.todo.completed }}>{props.todo.title}</span>
       </label>
       <button

@@ -3,12 +3,48 @@
 .d-todo-list {
   --text-color-todo-list: #{p.$black};
   --text-color-todo-list-error: #{p.$black};
+  --text-color-todo-list-add: #{p.$black};
+  --text-color-todo-list-add-hover: #{p.$grey-600};
+  --text-color-todo-list-add-disabled: #{p.$grey-500};
+  --surface-color-todo-list-add: #{p.$transparent};
+  --border-color-todo-list-add: #{p.$transparent};
+  --border-color-todo-list-add-hover: #{p.$grey-300};
 }
 .todo-list {
   color: var(--text-color-todo-list);
 
   .error {
     color: var(--text-color-todo-list-error);
+  }
+
+  // The fieldset below is display: contents, so the input and add button are this row's flex items.
+  form {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  // The Material box glyph fills 18/24 of its viewBox, so a 21.33px svg draws a 16px box.
+  .add-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 3.33px;
+    border: 1px solid var(--border-color-todo-list-add);
+    border-radius: 4px;
+    background-color: var(--surface-color-todo-list-add);
+    color: var(--text-color-todo-list-add);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      color: var(--text-color-todo-list-add-hover);
+      border-color: var(--border-color-todo-list-add-hover);
+    }
+    &:disabled {
+      color: var(--text-color-todo-list-add-disabled);
+      cursor: not-allowed;
+    }
   }
 
   // Only used to disable the add form's controls as a group; keep it out of the layout.

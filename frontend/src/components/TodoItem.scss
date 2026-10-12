@@ -4,6 +4,10 @@
     --text-color-todo-item: #{p.$black};
     --text-color-todo-item-completed: #{p.$black};
     --surface-color-todo-item-bullet: #{p.$black};
+    --text-color-todo-item-checkbox: #{p.$black};
+    --text-color-todo-item-checkbox-hover: #{p.$grey-600};
+    --border-color-todo-item-checkbox: #{p.$transparent};
+    --border-color-todo-item-checkbox-hover: #{p.$grey-300};
     --text-color-todo-item-delete: #{p.$black};
     --text-color-todo-item-delete-hover: #{p.$grey-600};
     --surface-color-todo-item-delete: #{p.$transparent};
@@ -28,10 +32,39 @@
     }
 
     label {
+        position: relative;
         display: flex;
         align-items: center;
         gap: 4px;
         min-width: 0;
+        cursor: pointer;
+
+        &:hover .checkbox-icon,
+        .checkbox-input:focus-visible + .checkbox-icon {
+            color: var(--text-color-todo-item-checkbox-hover);
+            border-color: var(--border-color-todo-item-checkbox-hover);
+        }
+    }
+
+    // Kept in the DOM and focusable (not display: none) so the real checkbox still
+    // drives keyboard and screen reader behaviour; the icon beside it is the visual.
+    .checkbox-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        opacity: 0;
+    }
+
+    // The Material box glyph fills 18/24 of its viewBox, so a 21.33px svg draws a 16px box;
+    // the extra padding keeps the overall button at the same 30px.
+    .checkbox-icon {
+        display: inline-flex;
+        padding: 3.33px;
+        border: 1px solid var(--border-color-todo-item-checkbox);
+        border-radius: 4px;
+        color: var(--text-color-todo-item-checkbox);
+        transition: color 0.15s, border-color 0.15s;
     }
 
     .completed {

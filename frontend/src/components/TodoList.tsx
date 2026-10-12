@@ -1,4 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
+import { MdFillAdd_box } from "solid-icons/md";
 import "./TodoList.scss";
 import { useI18n } from "~/context/I18nContext";
 import { useTodos } from "~/context/TodoContext";
@@ -46,7 +47,9 @@ export default function TodoList() {
             value={newTitle()}
             onInput={(e) => setNewTitle(e.currentTarget.value)}
           />
-          <button type="submit">{t("todos.add")}</button>
+          <button type="submit" class="add-button" title={t("todos.add")} aria-label={t("todos.add")}>
+            <MdFillAdd_box size={21.33} aria-hidden="true" />
+          </button>
         </fieldset>
       </form>
 

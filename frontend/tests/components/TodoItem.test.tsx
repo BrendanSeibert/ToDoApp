@@ -18,6 +18,21 @@ describe("TodoItem", () => {
     expect(screen.getByRole("checkbox")).toBeChecked();
   });
 
+  it("swaps the checkbox icon with the completed state", () => {
+    const { container, unmount } = renderWithI18n(() => (
+      <TodoItem todo={todo} onToggle={vi.fn()} onDelete={vi.fn()} />
+    ));
+    const uncheckedIcon = container.querySelector(".checkbox-icon")!.innerHTML;
+    unmount();
+
+    const { container: completedContainer } = renderWithI18n(() => (
+      <TodoItem todo={{ ...todo, completed: true }} onToggle={vi.fn()} onDelete={vi.fn()} />
+    ));
+
+    expect(uncheckedIcon).toContain("<svg");
+    expect(completedContainer.querySelector(".checkbox-icon")!.innerHTML).not.toBe(uncheckedIcon);
+  });
+
   it("calls onToggle with the todo id and new checked state", async () => {
     const onToggle = vi.fn();
     renderWithI18n(() => <TodoItem todo={todo} onToggle={onToggle} onDelete={vi.fn()} />);
