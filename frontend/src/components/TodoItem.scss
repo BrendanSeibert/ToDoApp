@@ -4,6 +4,7 @@
 .d-todo-item {
     --text-color-todo-item: #{p.$grey-900};
     --text-color-todo-item-completed: #{p.$grey-600};
+    --text-color-todo-item-pending: #{p.$grey-600};
     --surface-color-todo-item-hover: #{p.$grey-50};
     --border-color-todo-item: #{p.$grey-100};
     --text-color-todo-item-checkbox: #{p.$black};
@@ -27,6 +28,9 @@
     color: var(--text-color-todo-item);
     transition: background-color t.$transition;
 
+    &.pending {
+        color: var(--text-color-todo-item-pending);
+    }
     &:last-child {
         border-bottom: 0;
     }
@@ -43,6 +47,10 @@
         min-width: 0;
         cursor: pointer;
         overflow-wrap: anywhere;
+
+        &:has(.checkbox-input:disabled) {
+            cursor: default;
+        }
 
         &:hover .checkbox-icon,
         .checkbox-input:focus-visible + .checkbox-icon {
@@ -82,11 +90,15 @@
         border-color: var(--border-color-todo-item-delete);
         color: var(--text-color-todo-item-delete);
 
-        &:hover,
-        &:focus-visible {
+        &:hover:not(:disabled),
+        &:focus-visible:not(:disabled) {
             background-color: var(--surface-color-todo-item-delete-hover);
             color: var(--text-color-todo-item-delete-hover);
             border-color: var(--border-color-todo-item-delete-hover);
+        }
+
+        &:disabled {
+            cursor: default;
         }
     }
 }

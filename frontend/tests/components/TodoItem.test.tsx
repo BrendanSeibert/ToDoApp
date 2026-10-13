@@ -51,6 +51,25 @@ describe("TodoItem", () => {
     expect(onDelete).toHaveBeenCalledWith("t1");
   });
 
+  it("is inert and marked busy while pending", async () => {
+    const onToggle = vi.fn();
+    const onDelete = vi.fn();
+    const { container } = renderWithI18n(() => (
+      <TodoItem todo={todo} pending onToggle={onToggle} onDelete={onDelete} />
+    ));
+
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /delete buy milk/i })).toBeDisabled();
+    expect(container.querySelector("li")).toHaveAttribute("aria-busy", "true");
+    expect(container.querySelector("li")).toHaveClass("pending");
+
+    await fireEvent.click(screen.getByRole("checkbox"));
+    await fireEvent.click(screen.getByRole("button", { name: /delete buy milk/i }));
+
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
   it("renders its text from whichever dictionary the provider supplies", () => {
     const dictionary = { todoItem: { delete: "Löschen", deleteAria: "{title} löschen" } };
     render(() => (

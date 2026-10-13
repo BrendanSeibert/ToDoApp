@@ -10,7 +10,9 @@ This document is written for a developer or another Claude instance picking up t
 
 Adding or deleting a to-do takes roughly half a second to show up. In `frontend/src/context/TodoContext.tsx`, `createTodo` and `deleteTodo` `await` the API call and only then change the list, so nothing moves on screen until the full round trip finishes. `toggleTodo` already updates first and rolls back on failure, which is why toggling feels instant.
 
-This plan hides that latency. It does **not** remove it (CORS preflight and two sequential database queries per request are still there; see "Out of scope").
+This plan hides that latency. It also removes one avoidable piece of it, the CORS preflight that every POST/PATCH/DELETE currently pays, by caching the preflight (Step 6). It does **not** remove the two sequential database queries per request (see "Out of scope").
+
+This change also alters what the Selenium end-to-end suite has to do: pending rows are inert, so the e2e page objects and some tests must change in the same piece of work (Step 7). See `SeleniumEnd2EndTestingPlan.md` section 3.5 items 7 and 13.
 
 ## 2. Current behaviour (read these first)
 
@@ -22,6 +24,8 @@ This plan hides that latency. It does **not** remove it (CORS preflight and two 
 | `frontend/src/api/todos.ts` | `Todo { id, title, completed, createdAt }`. `createTodo(title)` returns the server's todo (with the real id). |
 | `frontend/tests/context/TodoContext.test.tsx` | Context tests (see section 6 for the ones that change). |
 | `frontend/tests/components/TodoList.test.tsx` | Mocks `~/context/TodoContext` with `useTodos: () => ({...})`. |
+| `backend/src/middleware.ts` | Answers every `OPTIONS` preflight with 204 and the CORS headers, but sends no `Access-Control-Max-Age`, so the browser repeats the preflight before each POST/PATCH/DELETE. |
+| `e2e/src/pages/TodoPage.ts`, `e2e/tests/todos.e2e.test.ts` | Selenium page object and tests. They currently assume a new row is immediately clickable; that stops being true (Step 7). |
 
 ## 3. Target behaviour
 
@@ -41,6 +45,15 @@ This plan hides that latency. It does **not** remove it (CORS preflight and two 
 5. **404 on delete counts as success.** The item is already gone on the server; restoring it would be wrong.
 6. **Every post-`await` step keeps the `userChangedSince` guard** and does nothing if the user changed (the store has already been cleared by the existing effect).
 7. **All user-facing text goes through `t()`** and all colours come from the palette via a `.d-<component>` variable. Do not add hex values outside `_palette.scss`.
+
+### Known trade-offs (accepted, not bugs to fix in this change)
+
+These follow from the design above. They are written down so a reviewer does not rediscover them.
+
+8. **The row remounts when the temporary id is swapped.** The store reconciles by `id`, so `pending-<n>` becoming the server id is a different item, not an update of the same one. The `<li>` is destroyed and recreated: keyboard focus on that row is lost and any CSS transition restarts. If this proves annoying, give `Todo` rows a stable client-side key and have `For` use it. Not needed for the first version.
+9. **One shared error slot.** `actionError` is a single value. A successful delete or toggle calls `setActionError(null)`, which can wipe the message of a create that failed moments earlier. Toggling already behaves this way. With several operations in flight it is a little more likely. A per-operation error list would fix it and is out of scope.
+10. **Empty-submit feedback is suppressed while a create is in flight.** The guard `pendingCreates() === 0` exists so a double click does not nag. The side effect is that a user who adds "A" and immediately presses Add on the now-empty input gets no "Enter a to-do item" message until the create resolves. Accepted.
+11. **No ordering guarantee between concurrent creates.** The list is ordered by `createdAt` on the server (`todoRepository.ts`). Two POSTs in flight at once can commit in either order, so the order seen locally (append order) can differ from the order after a reload. The unit test "two creates in flight end up in order" only proves local order. The e2e suite checks the reloaded order (Step 7).
 
 ## 5. Implementation steps
 
@@ -191,6 +204,37 @@ See section 6.
 
 See section 7.
 
+### Step 6 — Cache the CORS preflight (`backend/src/middleware.ts`)
+
+**Why:** every non-GET request currently triggers a separate `OPTIONS` round trip first. Optimistic UI hides the wait for a request; this removes a whole round trip from it. It is one line and does not change behaviour.
+
+1. Inside the existing `if (corsHeaders) { ... }` block add:
+
+   ```ts
+   // Let the browser reuse the preflight result. Chrome caps this at 7200 s; Firefox at 86400 s.
+   headers.set("Access-Control-Max-Age", "7200");
+   ```
+
+   Keep it inside the block so a request from a disallowed origin still gets a bare 204 with no CORS headers.
+
+2. Add a unit test next to the other backend tests (there is none for the middleware today), for example `backend/tests/unit/lib/middleware.test.ts`: an `OPTIONS` request from the allowed origin gets `Access-Control-Max-Age: 7200`, and one from another origin gets none of the `Access-Control-*` headers.
+
+3. Check the `Dockerfile` target `runtime` still builds; no other backend file changes.
+
+### Step 7 — Update the Selenium suite (`e2e/`)
+
+Do this in the same change as Steps 1 to 3. With only those steps applied, the existing e2e tests become flaky (a freshly added row is disabled until the server replies, and Selenium's click on a disabled control does nothing and raises no error). Full detail and rationale: `SeleniumEnd2EndTestingPlan.md` section 3.5 items 7 and 13, Step 8 (`TodoPage`), and section 6 (`optimistic.e2e.test.ts`).
+
+1. **`e2e/src/pages/TodoPage.ts`**
+   - Add `waitUntilSettled(title)`: waits until a row with that title exists, has no `pending` class, and its `aria-busy` is not `"true"`.
+   - Call it at the start of `toggle()` and `delete()` (before the click), so they never click a pending row.
+   - Add `addAndSettle(title)`: `addTodo` + `waitForTitle` + `waitUntilSettled` + `waitForSaved`.
+   - Add small read helpers used by the new tests: `isPending(title)`, `isRowControlsEnabled(title)`.
+2. **`e2e/src/helpers/network.ts`** (new): thin wrappers over `driver.setNetworkConditions(...)`: `goOffline(driver)`, `addLatency(driver, ms)`, `restoreNetwork(driver)`. Always restore in `afterEach`, otherwise one failing test poisons the next.
+3. **Existing tests** (`todos.e2e.test.ts`): use `addAndSettle` where a row is toggled or deleted straight after being added; in "shows the empty state after deleting the last to-do" also call `waitForSavedGone` so a rolled-back delete cannot pass.
+4. **New `e2e/tests/optimistic.e2e.test.ts`** with the scenarios listed in `SeleniumEnd2EndTestingPlan.md` section 6.
+5. Run `cd e2e && npm run e2e` three times in a row; all three must pass.
+
 ## 6. Test changes
 
 Use the existing helpers: `renderWithI18n`, the `deferred()` helper pattern already used in `TodoList.test.tsx` and `TodoContext.test.tsx`, and Vitest fake timers where timers matter.
@@ -243,6 +287,10 @@ npm test
 
 All three must pass.
 
+From `backend/`: `npm test` (includes the new middleware test from Step 6).
+
+From `e2e/`: `npm run e2e`, three times in a row. All 33 existing tests plus the new `optimistic.e2e.test.ts` scenarios must pass without retries (Step 7).
+
 Manual checks in the browser (`npm run dev`, or the compose stack):
 
 1. Add a to-do: it appears at once and the input clears.
@@ -252,6 +300,7 @@ Manual checks in the browser (`npm run dev`, or the compose stack):
 5. Double-click Add with text in the input: one to-do is created and no "Enter a to-do item" message appears.
 6. Press Add with an empty input (no create pending): the message still appears and still disappears after 15 s or on typing.
 7. A pending row cannot be toggled or deleted.
+8. In the browser's network tab, after the first POST the following POST/PATCH/DELETE requests to the API send **no** `OPTIONS` request within two hours (Step 6).
 
 ## 8. Acceptance criteria
 
@@ -260,6 +309,8 @@ Manual checks in the browser (`npm run dev`, or the compose stack):
 - No behaviour regression for toggle, loading, user switching, or the empty-title message.
 - Typecheck, build and the full test suite pass.
 - No new hex values outside `_palette.scss`; no hard-coded user-facing strings.
+- Preflight responses carry `Access-Control-Max-Age` for allowed origins only, and have a unit test.
+- The Selenium suite is updated (Step 7) and passes three runs in a row, including the new optimistic scenarios: row visible while the request is outstanding, inert while pending, rollback on add, rollback on delete at the original position.
 
 ## 9. Conventions for this repo
 
@@ -272,6 +323,8 @@ Manual checks in the browser (`npm run dev`, or the compose stack):
 
 These reduce the real latency rather than hiding it, and are intentionally not part of this change:
 
-- Add `Access-Control-Max-Age` to the `OPTIONS` response in `backend/src/middleware.ts`, or serve the API same-origin through nginx, to avoid a preflight on every action.
+- Serve the API same-origin through nginx, which removes the preflight entirely and removes the cross-site cookie constraints (this one is a deployment change; `Access-Control-Max-Age` in Step 6 already captures most of the benefit).
+- A per-operation error list instead of one shared `actionError` (trade-off 9).
+- A stable client-side row key so the row is not remounted when the server id arrives (trade-off 8).
 - Merge the session lookup and the to-do query into a single Cypher query per request (currently two sequential Neo4j round trips).
 - Measure against a production build (`docker compose up --build`) rather than the dev server before judging remaining latency.

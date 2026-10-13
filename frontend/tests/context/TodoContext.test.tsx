@@ -67,17 +67,25 @@ async function renderLoggedIn(todos?: unknown[]) {
 }
 
 function Consumer() {
-  const { todos, loading, error, createTodo, toggleTodo, deleteTodo } = useTodos();
+  const { todos, loading, error, isPending, createTodo, toggleTodo, deleteTodo } = useTodos();
+  const pendingId = () => todos().find((todo) => isPending(todo.id))?.id ?? "none";
 
   return (
     <div>
       <p data-testid="loading">{String(loading())}</p>
       <p data-testid="error">{error() ?? "none"}</p>
       <ul data-testid="todos">
-        <For each={todos()}>{(todo) => <li>{`${todo.id}:${todo.title}:${todo.completed}`}</li>}</For>
+        <For each={todos()}>{(todo) => <li>{`${todo.id}:${todo.title}:${todo.completed}:${isPending(todo.id)}`}</li>}</For>
       </ul>
+      <p data-testid="pending-id">{pendingId()}</p>
       <button type="button" onClick={() => createTodo("New todo")}>
         create
+      </button>
+      <button type="button" onClick={() => toggleTodo(pendingId(), true)}>
+        toggle pending
+      </button>
+      <button type="button" onClick={() => deleteTodo(pendingId())}>
+        delete pending
       </button>
       <button type="button" onClick={() => toggleTodo("t1", true)}>
         toggle
@@ -118,7 +126,7 @@ describe("TodoProvider", () => {
 
     setMockUser(loggedInUser);
 
-    expect(await screen.findByText("t1:Buy milk:false")).toBeInTheDocument();
+    expect(await screen.findByText("t1:Buy milk:false:false")).toBeInTheDocument();
     expect(mockedListTodos).toHaveBeenCalledTimes(1);
   });
 
@@ -130,11 +138,11 @@ describe("TodoProvider", () => {
       </TodoProvider>
     ));
     setMockUser(loggedInUser);
-    await screen.findByText("t1:Buy milk:false");
+    await screen.findByText("t1:Buy milk:false:false");
 
     setMockUser(null);
 
-    expect(screen.queryByText("t1:Buy milk:false")).not.toBeInTheDocument();
+    expect(screen.queryByText("t1:Buy milk:false:false")).not.toBeInTheDocument();
   });
 
   it("sets an error message when the initial fetch fails", async () => {
@@ -150,30 +158,69 @@ describe("TodoProvider", () => {
     expect(await screen.findByText("Failed to load to-dos.")).toBeInTheDocument();
   });
 
-  it("adds the todo to the store only after the backend call succeeds", async () => {
+  it("shows the new todo as pending at once, then swaps in the server's todo", async () => {
     const create = deferred<unknown>();
     mockedCreateTodo.mockReturnValue(create.promise);
     await renderLoggedIn([]);
 
     await fireEvent.click(screen.getByRole("button", { name: "create" }));
-    await flushPromises();
-    expect(screen.queryByText(/New todo/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^pending-\d+:New todo:false:true$/)).toBeInTheDocument();
 
     create.resolve({ id: "t2", title: "New todo", completed: false });
 
-    expect(await screen.findByText("t2:New todo:false")).toBeInTheDocument();
+    expect(await screen.findByText("t2:New todo:false:false")).toBeInTheDocument();
+    expect(screen.queryByText(/pending-/)).not.toBeInTheDocument();
   });
 
-  it("does not add the todo when the backend call fails", async () => {
+  it("removes the pending todo and reports an error when the create fails", async () => {
     const create = deferred<unknown>();
     mockedCreateTodo.mockReturnValue(create.promise);
     await renderLoggedIn([]);
 
     await fireEvent.click(screen.getByRole("button", { name: "create" }));
+    expect(screen.getByText(/New todo/)).toBeInTheDocument();
+
     create.reject(new Error("boom"));
 
     expect(await screen.findByText("Failed to create to-do.")).toBeInTheDocument();
     expect(screen.queryByText(/New todo/)).not.toBeInTheDocument();
+  });
+
+  it("resolves two creates in flight independently and keeps their order", async () => {
+    const first = deferred<unknown>();
+    const second = deferred<unknown>();
+    mockedCreateTodo.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    await renderLoggedIn([]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "create" }));
+    await fireEvent.click(screen.getByRole("button", { name: "create" }));
+    expect(screen.getAllByText(/^pending-\d+:New todo:false:true$/)).toHaveLength(2);
+
+    // Resolve out of order: the rows keep their positions.
+    second.resolve({ id: "t3", title: "Second", completed: false });
+    await screen.findByText("t3:Second:false:false");
+    first.resolve({ id: "t2", title: "First", completed: false });
+    await screen.findByText("t2:First:false:false");
+
+    const rows = screen.getAllByRole("listitem").map((item) => item.textContent);
+    expect(rows).toEqual(["t2:First:false:false", "t3:Second:false:false"]);
+  });
+
+  it("ignores toggling or deleting a pending todo", async () => {
+    const create = deferred<unknown>();
+    mockedCreateTodo.mockReturnValue(create.promise);
+    await renderLoggedIn([]);
+    await fireEvent.click(screen.getByRole("button", { name: "create" }));
+
+    await fireEvent.click(screen.getByRole("button", { name: "toggle pending" }));
+    await fireEvent.click(screen.getByRole("button", { name: "delete pending" }));
+
+    expect(mockedSetCompleted).not.toHaveBeenCalled();
+    expect(mockedDeleteTodo).not.toHaveBeenCalled();
+    expect(screen.getByText(/^pending-\d+:New todo:false:true$/)).toBeInTheDocument();
+
+    create.resolve({ id: "t2", title: "New todo", completed: false });
+    await screen.findByText("t2:New todo:false:false");
   });
 
   it("optimistically toggles a todo then rolls back if the backend call fails", async () => {
@@ -182,12 +229,12 @@ describe("TodoProvider", () => {
     await renderLoggedIn([buyMilk()]);
 
     await fireEvent.click(screen.getByRole("button", { name: "toggle" }));
-    expect(screen.getByText("t1:Buy milk:true")).toBeInTheDocument();
+    expect(screen.getByText("t1:Buy milk:true:false")).toBeInTheDocument();
 
     update.reject(new Error("boom"));
 
     expect(await screen.findByText("Failed to update to-do.")).toBeInTheDocument();
-    expect(screen.getByText("t1:Buy milk:false")).toBeInTheDocument();
+    expect(screen.getByText("t1:Buy milk:false:false")).toBeInTheDocument();
   });
 
   it("keeps a todo toggled when the backend call succeeds", async () => {
@@ -196,39 +243,70 @@ describe("TodoProvider", () => {
     await renderLoggedIn([buyMilk()]);
 
     await fireEvent.click(screen.getByRole("button", { name: "toggle" }));
-    expect(screen.getByText("t1:Buy milk:true")).toBeInTheDocument();
+    expect(screen.getByText("t1:Buy milk:true:false")).toBeInTheDocument();
 
     update.resolve({ ...buyMilk(), completed: true });
     await flushPromises();
 
-    expect(screen.getByText("t1:Buy milk:true")).toBeInTheDocument();
+    expect(screen.getByText("t1:Buy milk:true:false")).toBeInTheDocument();
     expect(screen.getByTestId("error")).toHaveTextContent("none");
   });
 
-  it("removes the todo from the store only after the backend call succeeds", async () => {
+  it("removes the todo at once and keeps it removed when the backend call succeeds", async () => {
     const remove = deferred<unknown>();
     mockedDeleteTodo.mockReturnValue(remove.promise);
+    await renderLoggedIn([buyMilk()]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "delete" }));
+    expect(screen.queryByText(/t1:Buy milk/)).not.toBeInTheDocument();
+
+    remove.resolve({ ok: true });
+    await flushPromises();
+
+    expect(screen.queryByText(/t1:Buy milk/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("error")).toHaveTextContent("none");
+  });
+
+  it("restores the todo when the delete backend call fails", async () => {
+    const remove = deferred<unknown>();
+    mockedDeleteTodo.mockReturnValue(remove.promise);
+    await renderLoggedIn([buyMilk()]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "delete" }));
+    expect(screen.queryByText(/t1:Buy milk/)).not.toBeInTheDocument();
+
+    remove.reject(new Error("boom"));
+
+    expect(await screen.findByText("Failed to delete to-do.")).toBeInTheDocument();
+    expect(screen.getByText("t1:Buy milk:false:false")).toBeInTheDocument();
+  });
+
+  it("restores a failed delete at the original position", async () => {
+    const remove = deferred<unknown>();
+    mockedDeleteTodo.mockReturnValue(remove.promise);
+    await renderLoggedIn([
+      { id: "a", title: "One", completed: false },
+      { id: "t1", title: "Buy milk", completed: false },
+      { id: "c", title: "Three", completed: false },
+    ]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "delete" }));
+    remove.reject(new Error("boom"));
+    await screen.findByText("Failed to delete to-do.");
+
+    const rows = screen.getAllByRole("listitem").map((item) => item.textContent);
+    expect(rows).toEqual(["a:One:false:false", "t1:Buy milk:false:false", "c:Three:false:false"]);
+  });
+
+  it("treats a 404 on delete as success and leaves the todo removed", async () => {
+    mockedDeleteTodo.mockRejectedValue(new ApiError(404, "Not found"));
     await renderLoggedIn([buyMilk()]);
 
     await fireEvent.click(screen.getByRole("button", { name: "delete" }));
     await flushPromises();
-    expect(screen.getByText("t1:Buy milk:false")).toBeInTheDocument();
 
-    remove.resolve({ ok: true });
-
-    await waitFor(() => expect(screen.queryByText(/t1:Buy milk/)).not.toBeInTheDocument());
-  });
-
-  it("keeps the todo when the delete backend call fails", async () => {
-    const remove = deferred<unknown>();
-    mockedDeleteTodo.mockReturnValue(remove.promise);
-    await renderLoggedIn([buyMilk()]);
-
-    await fireEvent.click(screen.getByRole("button", { name: "delete" }));
-    remove.reject(new Error("boom"));
-
-    expect(await screen.findByText("Failed to delete to-do.")).toBeInTheDocument();
-    expect(screen.getByText("t1:Buy milk:false")).toBeInTheDocument();
+    expect(screen.queryByText(/t1:Buy milk/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("error")).toHaveTextContent("none");
   });
 
   it("does not roll back or report a toggle that fails after the user has changed", async () => {
@@ -241,12 +319,12 @@ describe("TodoProvider", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "toggle" }));
     setMockUser(otherUser);
-    await screen.findByText("t1:B's todo:true");
+    await screen.findByText("t1:B's todo:true:false");
 
     update.reject(new Error("boom"));
     await flushPromises();
 
-    expect(screen.getByText("t1:B's todo:true")).toBeInTheDocument();
+    expect(screen.getByText("t1:B's todo:true:false")).toBeInTheDocument();
     expect(screen.getByTestId("error")).toHaveTextContent("none");
   });
 
@@ -260,12 +338,12 @@ describe("TodoProvider", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "delete" }));
     setMockUser(otherUser);
-    await screen.findByText("t1:B's todo:false");
+    await screen.findByText("t1:B's todo:false:false");
 
     remove.resolve({ ok: true });
     await flushPromises();
 
-    expect(screen.getByText("t1:B's todo:false")).toBeInTheDocument();
+    expect(screen.getByText("t1:B's todo:false:false")).toBeInTheDocument();
   });
 
   it("does not report a delete failure after the user has changed", async () => {
@@ -305,13 +383,13 @@ describe("TodoProvider", () => {
     setMockUser(otherUser);
 
     fetchB.resolve([{ id: "b1", title: "B's todo", completed: false }]);
-    expect(await screen.findByText("b1:B's todo:false")).toBeInTheDocument();
+    expect(await screen.findByText("b1:B's todo:false:false")).toBeInTheDocument();
 
     fetchA.resolve([{ id: "a1", title: "A's todo", completed: false }]);
     await flushPromises();
 
     expect(screen.queryByText(/A's todo/)).not.toBeInTheDocument();
-    expect(screen.getByText("b1:B's todo:false")).toBeInTheDocument();
+    expect(screen.getByText("b1:B's todo:false:false")).toBeInTheDocument();
   });
 
   it("ignores a stale fetch when switching directly to another user", async () => {
@@ -324,7 +402,7 @@ describe("TodoProvider", () => {
     setMockUser(otherUser);
 
     fetchB.resolve([{ id: "b1", title: "B's todo", completed: false }]);
-    await screen.findByText("b1:B's todo:false");
+    await screen.findByText("b1:B's todo:false:false");
     fetchA.resolve([{ id: "a1", title: "A's todo", completed: false }]);
     await flushPromises();
 

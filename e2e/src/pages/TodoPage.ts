@@ -71,9 +71,32 @@ export class TodoPage extends BasePage {
     return (await (await this.visible(input)).getAttribute("value")) ?? "";
   }
 
+  /**
+   * Read in one browser call. With optimistic add the server's reply can replace a row between
+   * `findElements` and a following `getText`, which raises StaleElementReferenceError; reading
+   * every title inside a single script cannot be interleaved with a re-render.
+   */
   async titles(): Promise<string[]> {
-    const found = await this.driver.findElements(rows);
-    return Promise.all(found.map(async (row) => (await row.findElement(title)).getText()));
+    return this.driver.executeScript<string[]>(
+      `return Array.from(document.querySelectorAll(arguments[0])).map((row) => {
+         const span = row.querySelector(arguments[1]);
+         return span ? span.innerText.trim() : "";
+       });`,
+      ".todo-list li.todo-item",
+      "label > span:last-of-type",
+    );
+  }
+
+  /**
+   * Finds the row and reads from it in one retried step, so a row swapped for the server's
+   * version between the two calls is simply looked up again.
+   */
+  private async readRow<T>(value: string, read: (row: WebElement) => Promise<T>): Promise<T> {
+    const result = await this.waitUntil(`row "${value}"`, async () => {
+      const row = await this.findRow(value);
+      return row === null ? null : { value: await read(row) };
+    });
+    return result.value;
   }
 
   async rowCount(): Promise<number> {
@@ -101,6 +124,7 @@ export class TodoPage extends BasePage {
    * could abort the request and lose the change (plan section 3.5, item 8).
    */
   async toggle(value: string): Promise<void> {
+    await this.waitUntilSettled(value);
     const before = await this.isCompleted(value);
     const row = await this.waitUntil(`row "${value}"`, () => this.findRow(value));
     await row.findElement(checkboxIcon).click();
@@ -141,13 +165,44 @@ export class TodoPage extends BasePage {
   }
 
   async isCompleted(value: string): Promise<boolean> {
-    const row = await this.waitUntil(`row "${value}"`, () => this.findRow(value));
-    return row.findElement(checkboxInput).isSelected();
+    return this.readRow(value, (row) => row.findElement(checkboxInput).isSelected());
   }
 
+  /** Deletes the to-do. Waits for the row to settle first: a pending row's button is disabled. */
   async delete(value: string): Promise<void> {
+    await this.waitUntilSettled(value);
     const row = await this.waitUntil(`row "${value}"`, () => this.findRow(value));
     await row.findElement(deleteButton).click();
+  }
+
+  /** True while the row exists and is still waiting for its server id (optimistic add). */
+  async isPending(value: string): Promise<boolean> {
+    return this.readRow(value, async (row) => (await row.getAttribute("aria-busy")) === "true");
+  }
+
+  /** Waits until the row exists and is no longer pending, i.e. it can be toggled or deleted. */
+  async waitUntilSettled(value: string): Promise<void> {
+    await this.waitUntil(`row "${value}" to settle`, async () => {
+      const row = await this.findRow(value);
+      return row !== null && (await row.getAttribute("aria-busy")) !== "true";
+    });
+  }
+
+  /** True when the row's checkbox and delete button are both enabled. */
+  async controlsEnabled(value: string): Promise<boolean> {
+    return this.readRow(
+      value,
+      async (row) =>
+        (await row.findElement(checkboxInput).isEnabled()) && (await row.findElement(deleteButton).isEnabled()),
+    );
+  }
+
+  /** Adds a to-do and returns once the row is settled and the server has it. */
+  async addAndSettle(value: string): Promise<void> {
+    await this.addTodo(value);
+    await this.waitForTitle(value);
+    await this.waitUntilSettled(value);
+    await this.waitForSaved(value);
   }
 
   async emptyStateVisible(): Promise<boolean> {

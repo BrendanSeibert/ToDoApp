@@ -12,7 +12,7 @@ This document is written so that a developer who has never seen this repo, or an
 2. Words you need to know
 3. Facts about this app the tests depend on
 4. Target layout
-5. Implementation steps (Steps 1 to 14)
+5. Implementation steps (Steps 1 to 14, plus Step 15 for when optimistic add/delete lands)
 6. Scenario reference (what each test must assert)
 7. Troubleshooting
 8. Acceptance criteria
@@ -99,23 +99,37 @@ All UI text comes from `frontend/src/i18n/en.json`. Tests **import that file** i
 | Registering an email that exists | An account with this email already exists |
 | Wrong password or unknown email on login | Invalid email or password |
 | Registering an email without a dot in the domain (e.g. `user@localhost`; Chrome accepts it, the server's regex does not) | A valid email is required |
+| Registering with a password shorter than 8 characters | Password must be at least 8 characters |
 
-Put these in one constants file in the e2e package (Step 7). ("Password must be at least 8 characters" also exists on the server but cannot be reached through the UI, because Chrome blocks the submit first.)
+Put these in one constants file in the e2e package (Step 7).
+
+The last row is reachable through the UI. The password input has `minLength=8`, but Chrome's check does not fire for this app (see section 3.5 item 3), so the request reaches the server and this message is shown.
 
 ### 3.5 Behaviours that affect how tests are written
 
 1. **Emails are lower-cased by the backend.** Generate lower-case emails in tests, otherwise the email shown on screen will not match what you typed. (The one deliberate exception is the case-insensitivity scenario in section 6, which types mixed case on purpose.)
 2. **Passwords must be at least 8 characters.**
-3. **The browser validates the form before the server does.** The email field is `type="email" required` and the password field has `minLength=8`. Typing a short password with Selenium and pressing Submit makes Chrome show its own tooltip and **no request is sent**, so no server error appears. Test this by asserting the form did not submit (still on the auth screen, no alert) and that the input's validity flag is set. Do not look for a server message.
+3. **The browser's `type="email"` check runs before the server, but its `minLength` check does not.** The email field is `type="email" required` and the password field has `minLength=8`. Measured against the real app: a short password typed with Selenium **does reach the server**, which answers "Password must be at least 8 characters" (shown in the alert). The probable cause is that the input is controlled (`value={password()}`), so the framework re-assigns `input.value` on every keystroke, and Chrome only reports "too short" for a value whose last change was a user edit. A real user typing is most likely affected in the same way, so the `minLength` attribute is effectively inert today.
+
+   Write the test against the outcome that holds in both cases: the user stays on the register screen without an account, and *either* Chrome blocked the submit (`formIsInvalid()` is true) *or* the alert shows `serverMessages.passwordTooShort`. Do not assert only one of them: if the app is later fixed so the browser blocks the submit, a test pinned to the server message would fail for a good reason.
 4. **The real checkbox is visually hidden** (1px, transparent). Selenium cannot click it. Click the visible icon (`.checkbox-icon`) or the label instead, and read the state from the hidden input's `isSelected()`.
 5. **The "Enter a to-do item" message disappears** after 15 seconds, or as soon as the user types. The 15-second case is slow; make it skippable and give it its own timeout (Step 10). The same timer is better covered with fake timers in the frontend unit tests; keep the e2e version only as a real-browser sanity check.
 6. **Deleting an account logs you out** and returns to the login screen. Logging in again with those credentials must fail with "Invalid email or password".
-7. **Add and delete currently wait for the server** before the list updates. If the "optimistic add/delete" change (see `OptimisticAddDeletePlan.md`) is implemented later, rows appear immediately. Write waits as "wait until the row is present / gone", never "assume it is present right after the click", and the tests work in both worlds.
+7. **Add and delete currently wait for the server** before the list updates. If the "optimistic add/delete" change (see `OptimisticAddDeletePlan.md`) is implemented, rows appear immediately and the suite as written in Steps 1 to 14 is **not** enough on its own:
+   - A new row is *pending*: its checkbox and delete button are `disabled` until the server replies. Selenium's click on a disabled control does nothing and raises no error, so `toggle()` and `delete()` would wait out their full timeout, or pass or fail depending on a race. See item 13 and Step 15.
+   - `waitForTitle` returns at once, because the row is already there. It no longer proves the server accepted anything.
+   - None of the existing tests can tell optimistic from non-optimistic behaviour, and none cover rollback. New scenarios are required (section 6, `optimistic.e2e.test.ts`).
+
+   Until that change lands, Steps 1 to 14 are complete and correct as they stand.
 8. **Toggling a to-do is already optimistic** (`toggleTodo` in `frontend/src/context/TodoContext.tsx`). The checkbox and the `completed` class change immediately, **before** the PATCH request has finished. If a test toggles and then immediately reloads the page, the reload can abort the request and the change is lost, so the test fails at random. Before any reload, wait until the **server** reports the new state (`TodoPage.toggle()` and `waitForSaved()` in Step 8 do this by asking the API from inside the page). Use the same helpers after add and delete too, so the suite stays correct once those become optimistic.
+
+   Note that "the server has it" and "the UI has finished with it" are different moments. With optimistic add the server can hold the row before the browser has processed the response, so `waitForSaved` alone does not mean the row is clickable (item 13).
 9. **The to-do input and Add button are `disabled`** while the list is loading or a create is in flight. Typing into a disabled input throws `ElementNotInteractableError`, so "ready" means "input enabled", not just "input present". `TodoPage.typeTitle()` waits for this.
 10. **Titles are trimmed by the server** (and by the form), so `"  Buy milk  "` is stored and shown as `Buy milk`.
 11. **Titles are rendered as text**, so HTML characters such as `<b>` appear literally and are not interpreted.
-12. **Passwords sent to the login form must also be 8 or more characters.** The `minLength=8` check applies to login too. A "wrong password" test that uses a short wrong password never reaches the server.
+12. **Use passwords of 8 or more characters in login tests too.** The `minLength=8` attribute is on the login form as well. Because the attribute is not reliably enforced (item 3), a short password may or may not reach the server, and which message appears is not worth depending on. A "wrong password" test must use a wrong password of 8 or more characters so that the server's "Invalid email or password" is the only possible outcome.
+13. **(Applies once optimistic add/delete is implemented.) Pending rows are inert.** A just-added row carries a `pending` class and `aria-busy="true"`, and its checkbox and delete button are disabled, until the server replies and the row is swapped for the real one (which is a *different* DOM element, so any element reference taken earlier goes stale). Tests must wait for the row to be **settled** (present, not pending) before toggling or deleting it, and must re-find the row afterwards. `TodoPage.waitUntilSettled()` (Step 15) does this. Selenium will not tell you the click was ignored.
+14. **Simulating a failing server.** Do not stop the backend container: it is slow (restart plus health wait) and affects later tests. Use Chrome's network emulation instead (`driver.setNetworkConditions`, available on the Chrome driver): `offline: true` makes every request from the page fail immediately, and a non-zero `latency` holds every request open so the "request in flight" state can be observed. Emulation applies to the whole page, **including the `serverTodos()` helper**, so restore the network before calling `waitForSaved` / `toggle`. Always restore it in `afterEach`.
 
 ### 3.6 Selectors available today
 
@@ -166,7 +180,8 @@ EX2/
     │   │   ├── users.ts            # unique email + password
     │   │   ├── strings.ts          # reads frontend en.json
     │   │   ├── serverMessages.ts   # backend error texts
-    │   │   └── artifacts.ts        # screenshot + HTML on failure
+    │   │   ├── artifacts.ts        # screenshot + HTML on failure
+    │   │   └── network.ts          # (Step 15) go offline / add latency / restore
     │   └── pages/
     │       ├── BasePage.ts
     │       ├── AuthPage.ts
@@ -179,7 +194,8 @@ EX2/
         ├── todos.e2e.test.ts
         ├── emptyInput.e2e.test.ts
         ├── accountDeletion.e2e.test.ts
-        └── isolation.e2e.test.ts
+        ├── isolation.e2e.test.ts
+        └── optimistic.e2e.test.ts      # (Step 15) only once add/delete are optimistic
 ```
 
 Why a separate `e2e/` package: Selenium and Chrome-related dependencies stay out of the frontend and backend builds and Docker images.
@@ -513,6 +529,9 @@ export const serverMessages = {
   badCredentials: "Invalid email or password",
   // The backend requires a dot in the domain; Chrome's type="email" does not (e.g. "user@localhost").
   invalidEmail: "A valid email is required",
+  // Normally Chrome's minLength would block a short password first, but this app's controlled
+  // input clears Chrome's "user edited" flag, so the request reaches the server (section 3.5 item 3).
+  passwordTooShort: "Password must be at least 8 characters",
 };
 ```
 
@@ -670,10 +689,11 @@ export class AuthPage extends BasePage {
 
   /**
    * True when Chrome's own form validation rejects the current field values (no request was sent).
-   * Note: Chrome only reports "too short" (`minLength`) for values it considers user-edited, and
-   * `checkValidity()` has the same rule. This works because `fill()` types with real key events
-   * (`sendKeys`). Do not "optimise" `fill()` to set `value` through a script: the form would then
-   * look valid and the short-password test would fail.
+   * Note: Chrome only reports "too short" (`minLength`) for values whose last change was a user
+   * edit, and `checkValidity()` has the same rule. In this app the controlled input re-assigns its
+   * value on every keystroke, so this currently returns false for a short password even though
+   * `fill()` uses real key events. Use it only inside an "either outcome" assertion (section 3.5
+   * item 3), never as the sole expectation.
    */
   async formIsInvalid(): Promise<boolean> {
     const input = await this.visible(password);
@@ -1135,6 +1155,100 @@ Run each of these and confirm the expected result:
 
 ---
 
+### Step 15. Adapt the suite when add/delete become optimistic
+
+**When:** in the same change that implements `OptimisticAddDeletePlan.md` (its Step 7 points here). Not before: until then these helpers are harmless but unused, and `optimistic.e2e.test.ts` would fail because the app does not behave that way yet.
+
+**Why:** section 3.5 items 7, 8 and 13. Summary: new rows are disabled until the server replies, Selenium silently ignores clicks on disabled controls, and the existing tests cannot distinguish optimistic from non-optimistic behaviour.
+
+**15.1 `TodoPage`: wait for a row to be settled.** Add:
+
+```ts
+/** True while the row exists and is still waiting for its server id (optimistic add). */
+async isPending(value: string): Promise<boolean> {
+  const row = await this.waitUntil(`row "${value}"`, () => this.findRow(value));
+  return (await row.getAttribute("aria-busy")) === "true";
+}
+
+/** Waits until the row exists and is no longer pending, i.e. it can be toggled or deleted. */
+async waitUntilSettled(value: string): Promise<void> {
+  await this.waitUntil(`row "${value}" to settle`, async () => {
+    const row = await this.findRow(value);
+    return row !== null && (await row.getAttribute("aria-busy")) !== "true";
+  });
+}
+
+/** True when the row's checkbox and delete button are both enabled. */
+async controlsEnabled(value: string): Promise<boolean> {
+  const row = await this.waitUntil(`row "${value}"`, () => this.findRow(value));
+  return (
+    (await row.findElement(checkboxInput).isEnabled()) && (await row.findElement(deleteButton).isEnabled())
+  );
+}
+
+/** Adds a to-do and returns once the row is settled and the server has it. */
+async addAndSettle(value: string): Promise<void> {
+  await this.addTodo(value);
+  await this.waitForTitle(value);
+  await this.waitUntilSettled(value);
+  await this.waitForSaved(value);
+}
+```
+
+Then call `await this.waitUntilSettled(value)` as the **first line** of `toggle()` and of `delete()`. `findRow` is re-run on every poll, so the row swap (a new DOM element) is handled.
+
+**15.2 `e2e/src/helpers/network.ts`** (new), a thin wrapper so tests do not repeat the emulation parameters:
+
+```ts
+import type { WebDriver } from "selenium-webdriver";
+import type { Driver as ChromeDriver } from "selenium-webdriver/chrome.js";
+
+// createDriver() returns a Chrome driver, which has setNetworkConditions.
+const chrome = (driver: WebDriver) => driver as unknown as ChromeDriver;
+
+export async function goOffline(driver: WebDriver): Promise<void> {
+  await chrome(driver).setNetworkConditions({
+    offline: true,
+    latency: 0,
+    download_throughput: -1,
+    upload_throughput: -1,
+  });
+}
+
+/** Holds every request open for about `ms` milliseconds so the "in flight" state is observable. */
+export async function addLatency(driver: WebDriver, ms: number): Promise<void> {
+  await chrome(driver).setNetworkConditions({
+    offline: false,
+    latency: ms,
+    download_throughput: -1,
+    upload_throughput: -1,
+  });
+}
+
+export async function restoreNetwork(driver: WebDriver): Promise<void> {
+  await chrome(driver).setNetworkConditions({
+    offline: false,
+    latency: 0,
+    download_throughput: -1,
+    upload_throughput: -1,
+  });
+}
+```
+
+If `tsc` rejects the cast or the exact parameter names on your installed `@types/selenium-webdriver`, check `node_modules/selenium-webdriver/chromium.js` (`setNetworkConditions`) for the expected object. In the test lifecycle add `await restoreNetwork(driver)` to `afterEach`, **before** saving artefacts, so a failed test cannot leave the browser offline for the next one (and so `saveArtifacts` can reach the page).
+
+**15.3 Existing tests.** In `todos.e2e.test.ts`:
+
+- Replace "add, `waitForTitle`" with `addAndSettle(...)` wherever the row is toggled or deleted straight afterwards (tests: marks completed, deletes, shows empty state).
+- "shows the empty state after deleting the last to-do": after `waitForTitleGone` add `await todos.waitForSavedGone("Only item")`, then assert the empty state. Otherwise a rolled-back delete would still pass.
+- "lists to-dos in the order they were added": after the three adds call `waitForSaved` for each, **reload**, and assert the order again. With optimistic add the local order is no longer evidence of the server order (concurrent POSTs).
+
+**15.4 New `optimistic.e2e.test.ts`** with the scenarios in section 6. Keep it small: the unit tests own the exhaustive rollback logic; these confirm it works in a real browser, with a real network and the real cookie.
+
+**Expected result:** the whole suite, including the new file, passes three runs in a row with `retry: 0`. As a sanity check, temporarily revert the optimistic change in the frontend and confirm `optimistic.e2e.test.ts` fails (and the older tests still pass).
+
+---
+
 ## 6. Scenario reference
 
 Notation: **Given** a starting state, **When** an action, **Then** what to assert. `A` is a freshly generated user. "On the to-do screen" means `TodoPage.waitUntilReady()` returns.
@@ -1145,7 +1259,7 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 |---|---|
 | registers a new user and lands on the to-do screen | Open app; `register(A)`; wait for the to-do screen; navbar title is `t("navbar.todos")`; `AccountMenu.shownEmail()` equals A's email; the list shows `t("todos.empty")` |
 | shows an error for an email that already exists | Register A; log out; on the login screen switch to register; register A again; `AuthPage.errorText()` equals `serverMessages.emailTaken`; still on the auth screen |
-| does not submit a password shorter than 8 characters | Show register; fill a valid email and `"short"`; submit; assert `formIsInvalid()` is true, `hasError()` is false, and the heading is still `t("auth.register.heading")` (browser validation blocked the request) |
+| does not register a password shorter than 8 characters | Show register; fill a valid email and `"short"`; submit; the heading is still `t("auth.register.heading")`; and **either** `formIsInvalid()` is true (browser blocked it) **or** `errorText()` equals `serverMessages.passwordTooShort` (server rejected it). Today the second case happens (section 3.5 item 3) |
 | shows the server's error for an email Chrome accepts but the server rejects | Show register; fill `user@localhost` and a password of 8 or more characters; submit; `errorText()` equals `serverMessages.invalidEmail`; still on the auth screen |
 | can switch between login and register | Heading starts as `t("auth.login.heading")`; click the switch link; heading is `t("auth.register.heading")`; click again; back to login |
 
@@ -1154,7 +1268,7 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 | Test | Steps and assertions |
 |---|---|
 | logs in with valid credentials | Register A; log out; `login(A)`; to-do screen shown; shown email equals A's |
-| rejects a wrong password | Register A; log out; `login` with the right email and a different password **of 8 or more characters** (a shorter one never reaches the server, section 3.5 item 12); `errorText()` equals `serverMessages.badCredentials`; still on the auth screen |
+| rejects a wrong password | Register A; log out; `login` with the right email and a different password **of 8 or more characters** (so the server's message is the only possible outcome, section 3.5 item 12); `errorText()` equals `serverMessages.badCredentials`; still on the auth screen |
 | rejects an unknown email | `login` with a never-registered email and a password of 8 or more characters; `errorText()` equals `serverMessages.badCredentials` |
 | treats the email as case-insensitive | Register with a mixed-case email such as `E2E-Case-<unique>@Example.com`; `AccountMenu.shownEmail()` equals the lower-case form; log out; `login` with the lower-case form; to-do screen shown |
 | logs out and stays logged out after a reload | Register A; `logOut()`; heading is `t("auth.login.heading")`; `driver.navigate().refresh()`; still the login screen |
@@ -1201,6 +1315,21 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 |---|---|
 | one user never sees another user's to-dos | Register A; add "Private A"; log out; register B; list is empty; add "Private B"; log out; log in as A; `titles()` equals `["Private A"]` |
 
+### `optimistic.e2e.test.ts` (Step 15, only once add/delete are optimistic)
+
+Each test restores the network in `afterEach`. "Latency" and "offline" are the helpers from `helpers/network.ts`. Call `restoreNetwork` before using `waitForSaved`, `toggle` or any other helper that talks to the API from the page (section 3.5 item 14).
+
+| Test | Steps and assertions |
+|---|---|
+| a new to-do appears before the server replies | Register A; wait ready; `addLatency(2000)`; `addTodo("Slow add")`; within the normal wait the row exists, `isPending("Slow add")` is true, the input is empty and **enabled**; `restoreNetwork`; `waitUntilSettled`; `waitForSaved`; refresh; the row is still there (no duplicate) |
+| a pending row cannot be toggled or deleted | Same setup; while pending `controlsEnabled("Slow add")` is false; after settling it is true |
+| a failed add is rolled back and the title returned | Register A; `goOffline`; `addTodo("Will fail")`; wait for the alert; `alertText()` equals `t("errors.createTodo")`; `rowCount()` is 0; `inputValue()` equals `"Will fail"`; `restoreNetwork`; refresh; list is empty |
+| a failed delete is restored at its original position | Register A; `addAndSettle` "One", "Two", "Three"; `goOffline`; `delete("Two")`; wait for the alert; `alertText()` equals `t("errors.deleteTodo")`; `titles()` equals `["One","Two","Three"]`; `restoreNetwork`; `waitForSaved("Two")` |
+
+For the two rollback tests assert the **final** state, not the intermediate "row vanished" state: with the network offline the request fails within milliseconds, so the row is gone for too short a time to observe reliably. The brief disappearance is covered by the unit tests; the e2e test proves the end state in a real browser.
+| a double click on Add creates one to-do and no empty-title error | Register A; `addLatency(1500)`; `typeTitle("Once")`; `clickAdd()` twice in a row; `hasAlert()` is false; `rowCount()` is 1; `restoreNetwork`; `waitUntilSettled("Once")`; refresh; `titles()` equals `["Once"]` |
+| several quick adds keep their order after a reload | Register A; `addTodo` "A", "B", "C" without waiting between them; wait until all three are settled and saved; refresh; `titles()` equals `["A","B","C"]`. If this ever fails, it is the ordering trade-off (`OptimisticAddDeletePlan.md` section 4, item 11), not a test bug |
+
 ## 7. Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -1214,8 +1343,11 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 | `StaleElementReferenceError` | The list re-rendered between finding and clicking | Use `waitUntil`/the page-object methods that re-find the row |
 | A test passes alone but fails in the suite | Shared state or timing assumption | Ensure the test registers its own user and waits on conditions |
 | `Missing UI string: ...` | A key was renamed in `en.json` | Update the key in the test or helper |
-| Short-password test finds no server error | Expected: Chrome blocks the submit | Assert `formIsInvalid()` as in section 6 |
-| "Wrong password" or "unknown email" test finds no server error | The password used was shorter than 8 characters, so Chrome blocked the submit | Use a password of 8 or more characters |
+| Short-password test fails on `formIsInvalid()` being false | Chrome's `minLength` check does not fire for this app's controlled input; the server rejected it instead | Assert the either-outcome form in section 6 (browser blocked **or** `serverMessages.passwordTooShort`) |
+| "Wrong password" test shows an unexpected message or none | The password used was shorter than 8 characters, so the outcome is not the server's "Invalid email or password" | Use a password of 8 or more characters |
+| After optimistic add: toggle/delete times out, or passes only sometimes | The row was still pending, so its controls were disabled and the click was silently ignored | Call `waitUntilSettled()` first (Step 15, section 3.5 item 13) |
+| After optimistic add: `StaleElementReferenceError` on a row | The row was replaced by the server's version (new DOM element) between find and click | Re-find through the page-object methods; never hold a row element across a wait |
+| A test after a failed rollback test is offline or very slow | Network emulation was not restored | `restoreNetwork` in `afterEach` (Step 15.2) |
 | A toggle / add / delete test passes alone but fails now and then after a reload | The reload happened while the request was still in flight, so the change was lost | Call `toggle()` / `waitForSaved()` / `waitForSavedGone()` before reloading (section 3.5 item 8) |
 | `ElementNotInteractableError` when typing in the to-do input | The input is disabled while the list loads or a create is in flight | Use `typeTitle()` / `addTodo()`, which wait for it to be enabled |
 | Manually opened app logs you out of the other stack | Both stacks set the same cookie on `localhost` (cookies ignore ports) | Use a private window or separate Chrome profile for each stack |
@@ -1232,6 +1364,7 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 - No fixed sleeps anywhere in `e2e/` (the 1-second polling interval in the readiness check in `globalSetup.ts` is the only timed pause, and it is not inside a test).
 - `retry` is `0`, and the suite passes without retries.
 - Every test that reloads the page after a change first waits for the server to have that change.
+- **Once add/delete are optimistic (Step 15):** every test that toggles or deletes a row it just added waits for it to be settled first; `optimistic.e2e.test.ts` exists and passes; the network is restored after every test; and the suite still passes three runs in a row with `retry: 0`.
 - `npm run e2e -- -t "<name with spaces>"` works on Windows, and Ctrl+C still tears the stack down.
 - UI strings are read from `frontend/src/i18n/en.json`, not hard-coded (apart from the two server messages in `serverMessages.ts`).
 - The README has the new section, and following it works.
@@ -1250,7 +1383,8 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 - **CI:** a job could run `npm run e2e` on a runner that has Docker and Chrome (hosted Linux runners do). Upload `e2e/artifacts/` on failure. Not part of this change.
 - **Parallelism:** `fileParallelism` is off. Because every test uses a unique user, it could be turned on later to cut run time, once the suite has proven stable.
 - **Accessibility checks:** `@axe-core/webdriverjs` could assert the landmark, label and contrast fixes made earlier. Worth a follow-up.
-- **Optimistic add/delete:** if `OptimisticAddDeletePlan.md` is implemented, re-run this suite; it should pass unchanged because the waits are condition-based and tests wait for the server (`waitForSaved` / `waitForSavedGone`) before reloading. Add scenarios for rollback by stopping the backend container mid-test.
-- **Server-error states:** the messages `errors.loadTodos`, `errors.createTodo`, `errors.updateTodo` and `errors.deleteTodo` are not covered by this first version. They need a way to make the backend fail (stop the backend container mid-test, or a request-intercepting proxy), so they are a follow-up.
+- **Optimistic add/delete:** when `OptimisticAddDeletePlan.md` is implemented, **this suite needs changes**; it does not pass unchanged. Pending rows are inert and Selenium silently ignores clicks on them, so `TodoPage` needs `waitUntilSettled()` and some tests need `addAndSettle()`; and new rollback / in-flight scenarios are required because nothing here can tell optimistic from non-optimistic behaviour. All of that is Step 15 and the `optimistic.e2e.test.ts` table in section 6. Do it in the same change as the app change.
+- **Server-error states:** `errors.createTodo` and `errors.deleteTodo` are covered by `optimistic.e2e.test.ts` (Step 15) using Chrome network emulation, which is faster and more deterministic than stopping the backend container. `errors.loadTodos` (offline during the initial fetch) and `errors.updateTodo` (offline during a toggle) are not covered yet; they follow the same pattern.
+- **Make `minLength` actually work:** the password input's `minLength=8` is not enforced by Chrome because the input is controlled (section 3.5 item 3), so a short password costs a server round trip and shows a server message. If the app changes that (for example by checking length in `handleSubmit`), update the registration test, which is written to accept both outcomes.
 - **Slow 15-second test:** if the frontend unit tests already cover the timer with fake timers, consider removing the e2e version to save about 15 seconds per run.
 - **`data-testid` hooks:** the suite currently relies on existing class names and ARIA labels. If the markup changes often, adding test ids would make selectors more stable.

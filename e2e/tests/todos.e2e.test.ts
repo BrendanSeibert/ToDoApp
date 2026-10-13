@@ -62,10 +62,14 @@ describe("to-dos", () => {
     const todos = await signedInTodoPage("order");
 
     for (const title of ["First", "Second", "Third"]) {
-      await todos.addTodo(title);
-      await todos.waitForTitle(title);
+      await todos.addAndSettle(title);
     }
 
+    expect(await todos.titles()).toEqual(["First", "Second", "Third"]);
+
+    // With optimistic add the local order is not evidence of the server's order.
+    await driver.navigate().refresh();
+    await todos.waitUntilReady();
     expect(await todos.titles()).toEqual(["First", "Second", "Third"]);
   });
 
@@ -85,9 +89,7 @@ describe("to-dos", () => {
   it("marks a to-do completed and keeps it so", async () => {
     const todos = await signedInTodoPage("toggle");
 
-    await todos.addTodo("Toggle me");
-    await todos.waitForTitle("Toggle me");
-    await todos.waitForSaved("Toggle me");
+    await todos.addAndSettle("Toggle me");
 
     await todos.toggle("Toggle me");
     expect(await todos.isCompleted("Toggle me")).toBe(true);
@@ -107,10 +109,8 @@ describe("to-dos", () => {
   it("deletes a to-do and keeps it deleted", async () => {
     const todos = await signedInTodoPage("delete");
 
-    await todos.addTodo("Keep me");
-    await todos.waitForTitle("Keep me");
-    await todos.addTodo("Remove me");
-    await todos.waitForTitle("Remove me");
+    await todos.addAndSettle("Keep me");
+    await todos.addAndSettle("Remove me");
 
     await todos.delete("Remove me");
     await todos.waitForTitleGone("Remove me");
@@ -125,10 +125,11 @@ describe("to-dos", () => {
   it("shows the empty state after deleting the last to-do", async () => {
     const todos = await signedInTodoPage("last");
 
-    await todos.addTodo("Only item");
-    await todos.waitForTitle("Only item");
+    await todos.addAndSettle("Only item");
     await todos.delete("Only item");
     await todos.waitForTitleGone("Only item");
+    // A rolled-back delete would bring the row back, so confirm the server really dropped it.
+    await todos.waitForSavedGone("Only item");
 
     expect(await todos.emptyStateVisible()).toBe(true);
   });

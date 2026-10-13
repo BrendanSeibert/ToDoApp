@@ -40,8 +40,7 @@ describe("smoke", () => {
     await todos.waitUntilReady();
     expect(await todos.navbarTitle()).toBe(t("navbar.todos"));
 
-    await todos.addTodo("Buy milk");
-    await todos.waitForTitle("Buy milk");
+    await todos.addAndSettle("Buy milk");
     expect(await todos.titles()).toEqual(["Buy milk"]);
   });
 });

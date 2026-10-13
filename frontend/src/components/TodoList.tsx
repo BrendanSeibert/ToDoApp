@@ -8,14 +8,15 @@ import TodoItem from "./TodoItem";
 const TITLE_ERROR_TIMEOUT_MS = 15_000;
 
 export default function TodoList() {
-  const { todos, loading, error, createTodo, toggleTodo, deleteTodo } = useTodos();
+  const { todos, loading, error, isPending, createTodo, toggleTodo, deleteTodo } = useTodos();
   const { t } = useI18n();
   const [newTitle, setNewTitle] = createSignal("");
-  const [submitting, setSubmitting] = createSignal(false);
-  // Adding during the initial fetch would be overwritten when it lands; adding while a
-  // create is in flight would duplicate it. Applied to each form control, so any control added
-  // to the form needs `disabled={formDisabled()}` too.
-  const formDisabled = () => loading() || submitting();
+  const [pendingCreates, setPendingCreates] = createSignal(0);
+  // Adding during the initial fetch would be overwritten when it lands, so the form is disabled
+  // until the list has loaded. Creates intentionally do not lock it: rows are added optimistically.
+  // Applied to each form control, so any control added to the form needs
+  // `disabled={formDisabled()}` too.
+  const formDisabled = () => loading();
   const [showTitleError, setShowTitleError] = createSignal(false);
   let titleErrorTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -39,17 +40,20 @@ export default function TodoList() {
     if (formDisabled()) return;
     const title = newTitle().trim();
     if (!title) {
-      showTitleRequired();
+      // The first click of a double click has already cleared the input; do not nag.
+      if (pendingCreates() === 0) showTitleRequired();
       return;
     }
 
     hideTitleRequired();
-    setSubmitting(true);
+    setNewTitle("");
+    setPendingCreates((count) => count + 1);
     try {
       const created = await createTodo(title);
-      if (created) setNewTitle("");
+      // Put the text back only if the user has not started typing something else.
+      if (!created && newTitle() === "") setNewTitle(title);
     } finally {
-      setSubmitting(false);
+      setPendingCreates((count) => count - 1);
     }
   }
 
@@ -105,7 +109,16 @@ export default function TodoList() {
       <Show when={!loading()} fallback={<p>{t("todos.loading")}</p>}>
         <Show when={todos().length > 0} fallback={<p>{t("todos.empty")}</p>}>
           <ul>
-            <For each={todos()}>{(todo) => <TodoItem todo={todo} onToggle={handleToggle} onDelete={handleDelete} />}</For>
+            <For each={todos()}>
+              {(todo) => (
+                <TodoItem
+                  todo={todo}
+                  pending={isPending(todo.id)}
+                  onToggle={handleToggle}
+                  onDelete={handleDelete}
+                />
+              )}
+            </For>
           </ul>
         </Show>
       </Show>

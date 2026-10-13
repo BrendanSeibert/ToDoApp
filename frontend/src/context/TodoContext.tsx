@@ -25,12 +25,16 @@ interface TodoContextValue {
   todos: Accessor<Todo[]>;
   loading: Accessor<boolean>;
   error: Accessor<string | null>;
+  isPending: (id: string) => boolean;
   createTodo: (title: string) => Promise<boolean>;
   toggleTodo: (id: string, completed: boolean) => Promise<boolean>;
   deleteTodo: (id: string) => Promise<boolean>;
 }
 
 const TodoContext = createContext<TodoContextValue>();
+
+// Source of temporary ids for optimistically added rows.
+let nextPendingId = 0;
 
 interface TodoProviderProps {
   children: JSX.Element;
@@ -58,6 +62,16 @@ export function TodoProvider(props: TodoProviderProps) {
   const { user } = useAuth();
   const { t } = useI18n();
   const [actionError, setActionError] = createSignal<string | null>(null);
+  // Ids of rows added optimistically that are still waiting for the server's todo.
+  const [pendingIds, setPendingIds] = createSignal<ReadonlySet<string>>(new Set<string>());
+  const isPending = (id: string) => pendingIds().has(id);
+  const setPending = (id: string, pending: boolean) =>
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   // Keyed by user id: a new user triggers a refetch, and responses from a superseded
   // request are discarded, so a slow fetch for a previous user can't land in the store.
@@ -73,6 +87,7 @@ export function TodoProvider(props: TodoProviderProps) {
       (currentUser) => {
         if (!currentUser) {
           mutate([]);
+          setPendingIds(new Set<string>());
           setActionError(null);
         }
       },
@@ -91,19 +106,30 @@ export function TodoProvider(props: TodoProviderProps) {
 
   async function createTodo(title: string): Promise<boolean> {
     const ownerId = user()?.id;
+    const tempId = `pending-${++nextPendingId}`;
+    const placeholder: Todo = { id: tempId, title, completed: false, createdAt: new Date().toISOString() };
+
+    mutate((prev) => [...prev, placeholder]);
+    setPending(tempId, true);
+    setActionError(null);
+
     try {
       const todo = await apiCreateTodo(title);
       if (userChangedSince(ownerId)) return false;
-      mutate((prev) => [...prev, todo]);
-      setActionError(null);
+      mutate((prev) => prev.map((item) => (item.id === tempId ? todo : item)));
+      setPending(tempId, false);
       return true;
     } catch (err) {
-      if (!userChangedSince(ownerId)) setActionError(errorMessage(err, t("errors.createTodo")));
+      if (userChangedSince(ownerId)) return false;
+      mutate((prev) => prev.filter((item) => item.id !== tempId));
+      setPending(tempId, false);
+      setActionError(errorMessage(err, t("errors.createTodo")));
       return false;
     }
   }
 
   async function toggleTodo(id: string, completed: boolean): Promise<boolean> {
+    if (isPending(id)) return false;
     const ownerId = user()?.id;
     const previous = todos().find((todo) => todo.id === id)?.completed;
     const setTodoCompleted = (value: boolean) =>
@@ -124,15 +150,34 @@ export function TodoProvider(props: TodoProviderProps) {
   }
 
   async function deleteTodo(id: string): Promise<boolean> {
+    if (isPending(id)) return false;
     const ownerId = user()?.id;
+    const index = todos().findIndex((item) => item.id === id);
+    if (index === -1) return false;
+    // Copy before removing: the store item is a reconciled proxy.
+    const removed = { ...todos()[index] };
+
+    mutate((prev) => prev.filter((item) => item.id !== id));
+
     try {
       await apiDeleteTodo(id);
       if (userChangedSince(ownerId)) return false;
-      mutate((prev) => prev.filter((todo) => todo.id !== id));
       setActionError(null);
       return true;
     } catch (err) {
-      if (!userChangedSince(ownerId)) setActionError(errorMessage(err, t("errors.deleteTodo")));
+      if (userChangedSince(ownerId)) return false;
+      // Already gone on the server, so restoring it would be wrong.
+      if (err instanceof ApiError && err.status === 404) {
+        setActionError(null);
+        return true;
+      }
+      mutate((prev) => {
+        if (prev.some((item) => item.id === removed.id)) return prev;
+        const next = [...prev];
+        next.splice(Math.min(index, next.length), 0, removed);
+        return next;
+      });
+      setActionError(errorMessage(err, t("errors.deleteTodo")));
       return false;
     }
   }
@@ -141,6 +186,7 @@ export function TodoProvider(props: TodoProviderProps) {
     todos,
     loading,
     error,
+    isPending,
     createTodo,
     toggleTodo,
     deleteTodo,

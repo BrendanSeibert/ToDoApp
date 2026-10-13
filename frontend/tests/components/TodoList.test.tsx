@@ -15,6 +15,7 @@ vi.mock("~/context/TodoContext", () => ({
     todos: () => mockedTodos,
     loading: mockedLoading,
     error: () => mockedError,
+    isPending: () => false,
     createTodo: mockedCreateTodo,
     toggleTodo: mockedToggleTodo,
     deleteTodo: mockedDeleteTodo,
@@ -74,7 +75,7 @@ describe("TodoList", () => {
     expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("");
   });
 
-  it("keeps the entered title when createTodo fails", async () => {
+  it("restores the entered title when createTodo fails", async () => {
     mockedCreateTodo.mockResolvedValue(false);
     renderWithI18n(() => <TodoList />);
 
@@ -84,7 +85,7 @@ describe("TodoList", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(mockedCreateTodo).toHaveBeenCalledWith("Buy milk");
-    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Buy milk");
+    await waitFor(() => expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Buy milk"));
   });
 
   it("calls toggleTodo when a todo's checkbox is clicked", async () => {
@@ -148,7 +149,7 @@ describe("TodoList", () => {
       expect(form()).toHaveAttribute("aria-busy", "false");
     });
 
-    it("is disabled while a create is in flight and ignores repeat submits", async () => {
+    it("clears the input immediately and stays enabled while a create is in flight", async () => {
       const create = deferred<boolean>();
       mockedCreateTodo.mockReturnValue(create.promise);
       renderWithI18n(() => <TodoList />);
@@ -156,16 +157,43 @@ describe("TodoList", () => {
       await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
       await fireEvent.click(addButton());
 
-      expect(titleInput()).toBeDisabled();
-      expect(addButton()).toBeDisabled();
+      expect(titleInput()).toHaveValue("");
+      expect(titleInput()).toBeEnabled();
+      expect(addButton()).toBeEnabled();
 
-      await fireEvent.submit(form());
+      create.resolve(true);
+      await waitFor(() => expect(titleInput()).toHaveValue(""));
+    });
+
+    it("does not show the empty-title message on a second submit while a create is pending", async () => {
+      const create = deferred<boolean>();
+      mockedCreateTodo.mockReturnValue(create.promise);
+      renderWithI18n(() => <TodoList />);
+
+      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+      await fireEvent.click(addButton());
+      await fireEvent.click(addButton());
+
+      expect(screen.queryByText("Enter a to-do item")).not.toBeInTheDocument();
       expect(mockedCreateTodo).toHaveBeenCalledTimes(1);
 
       create.resolve(true);
+    });
 
-      await waitFor(() => expect(titleInput()).toBeEnabled());
-      expect(titleInput()).toHaveValue("");
+    it("creates again when a second submit has new text while the first is pending", async () => {
+      const create = deferred<boolean>();
+      mockedCreateTodo.mockReturnValue(create.promise);
+      renderWithI18n(() => <TodoList />);
+
+      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+      await fireEvent.click(addButton());
+      await fireEvent.input(titleInput(), { target: { value: "Walk dog" } });
+      await fireEvent.click(addButton());
+
+      expect(mockedCreateTodo).toHaveBeenCalledTimes(2);
+      expect(mockedCreateTodo).toHaveBeenLastCalledWith("Walk dog");
+
+      create.resolve(true);
     });
 
     describe("empty title message", () => {
@@ -265,19 +293,34 @@ describe("TodoList", () => {
       });
     });
 
-    it("is re-enabled with the title kept after a failed create", async () => {
+    it("puts the title back in the input after a failed create", async () => {
       const create = deferred<boolean>();
       mockedCreateTodo.mockReturnValue(create.promise);
       renderWithI18n(() => <TodoList />);
 
       await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
       await fireEvent.click(addButton());
-      expect(addButton()).toBeDisabled();
+      expect(titleInput()).toHaveValue("");
 
       create.resolve(false);
 
-      await waitFor(() => expect(addButton()).toBeEnabled());
-      expect(titleInput()).toHaveValue("Buy milk");
+      await waitFor(() => expect(titleInput()).toHaveValue("Buy milk"));
+    });
+
+    it("does not restore the title after a failed create if the user typed something else", async () => {
+      const create = deferred<boolean>();
+      mockedCreateTodo.mockReturnValue(create.promise);
+      renderWithI18n(() => <TodoList />);
+
+      await fireEvent.input(titleInput(), { target: { value: "Buy milk" } });
+      await fireEvent.click(addButton());
+      await fireEvent.input(titleInput(), { target: { value: "Walk dog" } });
+
+      create.resolve(false);
+      await waitFor(() => expect(mockedCreateTodo).toHaveBeenCalledTimes(1));
+      await Promise.resolve();
+
+      expect(titleInput()).toHaveValue("Walk dog");
     });
   });
 });
