@@ -66,4 +66,64 @@ describe("todoRepository", () => {
     const repo = createTodoRepository(driver);
     await expect(repo.deleteTodo("u1", "missing")).resolves.toBe(false);
   });
+
+  it("deleteTodo returns false when the query returns no row at all", async () => {
+    const driver = createMockDriver(() => ({ records: [] }));
+    const repo = createTodoRepository(driver);
+    await expect(repo.deleteTodo("u1", "missing")).resolves.toBe(false);
+  });
+
+  describe("scoping to the owner", () => {
+    function capturing(records: unknown[]) {
+      const calls: Array<{ query: string; params: Record<string, unknown> }> = [];
+      const driver = createMockDriver((query, params) => {
+        calls.push({ query, params: params as Record<string, unknown> });
+        return { records };
+      });
+      return { driver, calls };
+    }
+    const todoRecord = fakeRecord({ t: { properties: { id: "t1", title: "A", completed: false } } });
+
+    it("createTodo attaches the todo to the given user", async () => {
+      const { driver, calls } = capturing([todoRecord]);
+      await createTodoRepository(driver).createTodo("u1", "Buy milk");
+
+      expect(calls[0].query).toMatch(/MATCH \(u:User \{id: \$userId\}\)[\s\S]*\(u\)-\[:OWNS\]->\(t\)/);
+      expect(calls[0].params).toMatchObject({ userId: "u1", title: "Buy milk" });
+    });
+
+    it("listTodos only matches todos the user owns", async () => {
+      const { driver, calls } = capturing([]);
+      await createTodoRepository(driver).listTodos("u1");
+
+      expect(calls[0].query).toMatch(/\(u:User \{id: \$userId\}\)-\[:OWNS\]->\(t:Todo\)/);
+      expect(calls[0].params).toEqual({ userId: "u1" });
+    });
+
+    it("setCompleted only matches a todo the user owns", async () => {
+      const { driver, calls } = capturing([todoRecord]);
+      await createTodoRepository(driver).setCompleted("u1", "t1", true);
+
+      expect(calls[0].query).toMatch(/\(u:User \{id: \$userId\}\)-\[:OWNS\]->\(t:Todo \{id: \$todoId\}\)/);
+      expect(calls[0].params).toEqual({ userId: "u1", todoId: "t1", completed: true });
+    });
+
+    it("deleteTodo only matches a todo the user owns", async () => {
+      const { driver, calls } = capturing([fakeRecord({ deletedCount: fakeInteger(1) })]);
+      await createTodoRepository(driver).deleteTodo("u1", "t1");
+
+      expect(calls[0].query).toMatch(/\(u:User \{id: \$userId\}\)-\[:OWNS\]->\(t:Todo \{id: \$todoId\}\)/);
+      expect(calls[0].params).toEqual({ userId: "u1", todoId: "t1" });
+    });
+  });
+
+  it("closes the session when a query fails", async () => {
+    const driver = createMockDriver(() => {
+      throw new Error("db down");
+    });
+    const repo = createTodoRepository(driver);
+
+    await expect(repo.listTodos("u1")).rejects.toThrow("db down");
+    expect(driver.session().close).toHaveBeenCalledTimes(1);
+  });
 });

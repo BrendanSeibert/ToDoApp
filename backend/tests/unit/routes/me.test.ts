@@ -37,6 +37,28 @@ describe("GET /api/auth/me", () => {
   });
 });
 
+describe("GET /api/auth/me for a user that no longer exists", () => {
+  it("returns 401 and clears the session cookie", async () => {
+    mockedCreateUserRepository.mockReturnValue({ findById: vi.fn().mockResolvedValue(null) });
+    const event = createMockEvent({ cookies: createStoredSession("u1") });
+
+    const response = await GET(event);
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    await expect(getUserIdFromEvent(event)).resolves.toBeNull();
+  });
+
+  it("returns 500 when the lookup fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockedCreateUserRepository.mockReturnValue({ findById: vi.fn().mockRejectedValue(new Error("db down")) });
+
+    const response = await GET(createMockEvent({ cookies: createStoredSession("u1") }));
+
+    expect(response.status).toBe(500);
+  });
+});
+
 describe("DELETE /api/auth/me", () => {
   it("returns 401 when not logged in", async () => {
     mockedCreateUserRepository.mockReturnValue({ deleteUser: vi.fn() });

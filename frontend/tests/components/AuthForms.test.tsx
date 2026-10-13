@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@solidjs/testing-library";
+import { fireEvent, screen, waitFor } from "@solidjs/testing-library";
+import en from "~/i18n/en.json";
 import { renderWithI18n } from "../helpers/renderWithI18n";
 
 vi.mock("~/api/auth", () => ({
@@ -61,5 +62,64 @@ describe("AuthForms", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
     expect(mockedSetCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it("shows a generic message when login fails with a non-API error", async () => {
+    mockedLogin.mockRejectedValue(new Error("boom"));
+    renderWithI18n(() => <AuthForms />);
+
+    await fireEvent.input(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(en.auth.genericError);
+  });
+
+  it("shows the server's message when registration fails", async () => {
+    mockedRegister.mockRejectedValue(new ApiError(400, "An account with this email already exists"));
+    renderWithI18n(() => <AuthForms />);
+
+    await fireEvent.click(screen.getByText(/need an account/i));
+    await fireEvent.input(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Register" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("An account with this email already exists");
+    expect(mockedSetCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it("disables the submit button while a request is in flight and clears the previous error", async () => {
+    mockedLogin.mockRejectedValueOnce(new ApiError(401, "Invalid email or password"));
+    let resolve!: (user: unknown) => void;
+    mockedLogin.mockReturnValueOnce(new Promise((res) => (resolve = res)));
+    renderWithI18n(() => <AuthForms />);
+    await fireEvent.input(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+    await screen.findByRole("alert");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(screen.getByRole("button", { name: "Log in" })).toBeDisabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    resolve({ id: "u1", email: "a@example.com", createdAt: "now" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Log in" })).toBeEnabled());
+  });
+
+  it("switches back to login mode and clears the error on each switch", async () => {
+    mockedLogin.mockRejectedValue(new ApiError(401, "Invalid email or password"));
+    renderWithI18n(() => <AuthForms />);
+    await fireEvent.input(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+    await screen.findByRole("alert");
+
+    await fireEvent.click(screen.getByText(/need an account/i));
+    expect(screen.getByRole("heading", { name: en.auth.register.heading })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByText(/already have an account/i));
+    expect(screen.getByRole("heading", { name: "Log in" })).toBeInTheDocument();
   });
 });

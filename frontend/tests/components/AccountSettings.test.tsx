@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@solidjs/testing-library";
+import { fireEvent, screen, waitFor } from "@solidjs/testing-library";
+import en from "~/i18n/en.json";
+import { ApiError } from "~/api/client";
 import { renderWithI18n } from "../helpers/renderWithI18n";
 
 vi.mock("~/api/auth", () => ({
@@ -63,5 +65,65 @@ describe("AccountSettings", () => {
 
     expect(screen.getByRole("button", { name: "Delete account" })).toBeInTheDocument();
     expect(mockedDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  describe("failures", () => {
+    const confirmDelete = async () => {
+      await fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+      await fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    };
+
+    it("shows the server's message when logout fails with an ApiError", async () => {
+      mockedLogout.mockRejectedValue(new ApiError(500, "Server down"));
+      renderWithI18n(() => <AccountSettings />);
+
+      await fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Server down");
+      expect(mockedSetCurrentUser).not.toHaveBeenCalled();
+    });
+
+    it("shows a generic message when logout fails with another error", async () => {
+      mockedLogout.mockRejectedValue(new Error("boom"));
+      renderWithI18n(() => <AccountSettings />);
+
+      await fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(en.account.logoutError);
+      expect(mockedSetCurrentUser).not.toHaveBeenCalled();
+    });
+
+    it("shows the server's message when deleting the account fails with an ApiError", async () => {
+      mockedDeleteAccount.mockRejectedValue(new ApiError(500, "Server down"));
+      renderWithI18n(() => <AccountSettings />);
+
+      await confirmDelete();
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Server down");
+      expect(mockedSetCurrentUser).not.toHaveBeenCalled();
+    });
+
+    it("shows a generic message when deleting the account fails with another error", async () => {
+      mockedDeleteAccount.mockRejectedValue(new Error("boom"));
+      renderWithI18n(() => <AccountSettings />);
+
+      await confirmDelete();
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(en.account.deleteError);
+      expect(mockedSetCurrentUser).not.toHaveBeenCalled();
+    });
+
+    it("clears a shown error when the next attempt starts", async () => {
+      mockedLogout.mockRejectedValueOnce(new ApiError(500, "Server down")).mockResolvedValueOnce({ ok: true });
+      renderWithI18n(() => <AccountSettings />);
+
+      await fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+      await fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+      await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+      expect(mockedSetCurrentUser).toHaveBeenCalledWith(null);
+    });
   });
 });

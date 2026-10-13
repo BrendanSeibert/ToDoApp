@@ -27,6 +27,34 @@ describe("POST /api/auth/login", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a body that is not valid JSON", async () => {
+    mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn() });
+    const response = await POST(createMockEvent({ method: "POST", rawBody: "{not json" }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Email and password are required" });
+  });
+
+  it.each([
+    ["a numeric email", { email: 42, password: "password123" }],
+    ["a null password", { email: "a@example.com", password: null }],
+  ])("rejects %s", async (_label, body) => {
+    const findByEmail = vi.fn();
+    mockedCreateUserRepository.mockReturnValue({ findByEmail });
+    const response = await POST(createMockEvent({ method: "POST", body }));
+
+    expect(response.status).toBe(400);
+    expect(findByEmail).not.toHaveBeenCalled();
+  });
+
+  it("looks the user up by the trimmed, lower-cased email", async () => {
+    const findByEmail = vi.fn().mockResolvedValue(null);
+    mockedCreateUserRepository.mockReturnValue({ findByEmail });
+    await POST(createMockEvent({ method: "POST", body: { email: "  A@Example.COM ", password: "whatever" } }));
+
+    expect(findByEmail).toHaveBeenCalledWith("a@example.com");
+  });
+
   it("rejects an unknown email with 401", async () => {
     mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn().mockResolvedValue(null) });
     const event = createMockEvent({ method: "POST", body: { email: "a@example.com", password: "whatever" } });

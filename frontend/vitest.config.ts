@@ -9,6 +9,14 @@ export default defineConfig({
     include: ["tests/**/*.test.{ts,tsx}"],
     setupFiles: ["./tests/setup.ts"],
     globals: false,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.d.ts", "src/index.tsx"],
+      reporter: ["text", "html"],
+      reportsDirectory: "coverage",
+      thresholds: { statements: 97, branches: 94, functions: 98, lines: 97 },
+    },
   },
   resolve: {
     conditions: ["development", "browser"],

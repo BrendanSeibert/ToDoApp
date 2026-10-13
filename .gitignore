@@ -17,3 +17,6 @@ frontend/dist/
 
 # E2E test failure artefacts
 e2e/artifacts/
+
+# Test coverage reports
+coverage/

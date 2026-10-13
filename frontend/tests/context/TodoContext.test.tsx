@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSignal, For } from "solid-js";
-import { fireEvent, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { renderWithI18n } from "../helpers/renderWithI18n";
 
 vi.mock("~/api/todos", () => ({
@@ -92,6 +92,12 @@ function Consumer() {
       </button>
       <button type="button" onClick={() => deleteTodo("t1")}>
         delete
+      </button>
+      <button type="button" onClick={() => toggleTodo("missing", true)}>
+        toggle missing
+      </button>
+      <button type="button" onClick={() => deleteTodo("missing")}>
+        delete missing
       </button>
     </div>
   );
@@ -456,5 +462,87 @@ describe("TodoProvider", () => {
     await flushPromises();
 
     expect(screen.queryByText(/New todo/)).not.toBeInTheDocument();
+  });
+
+  it("does not report a create failure after the user has changed", async () => {
+    const create = deferred<unknown>();
+    mockedCreateTodo.mockReturnValue(create.promise);
+    mockedListTodos.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await renderLoggedIn();
+
+    await fireEvent.click(screen.getByRole("button", { name: "create" }));
+    setMockUser(otherUser);
+    create.reject(new Error("boom"));
+    await flushPromises();
+
+    expect(screen.getByTestId("error")).toHaveTextContent("none");
+    expect(screen.queryByText("Failed to create to-do.")).not.toBeInTheDocument();
+  });
+
+  it("leaves the other todos unchanged when one is toggled", async () => {
+    mockedSetCompleted.mockResolvedValue({ ...buyMilk(), completed: true });
+    await renderLoggedIn([buyMilk(), { id: "t9", title: "Other", completed: false }]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+
+    expect(screen.getByText("t1:Buy milk:true:false")).toBeInTheDocument();
+    expect(screen.getByText("t9:Other:false:false")).toBeInTheDocument();
+  });
+
+  it("does not report a toggle that succeeds after the user has changed", async () => {
+    const update = deferred<unknown>();
+    mockedSetCompleted.mockReturnValue(update.promise);
+    // The same failed toggle would show an error; a stale success must not clear or set anything.
+    mockedListTodos.mockResolvedValueOnce([buyMilk()]).mockResolvedValueOnce([{ id: "t1", title: "B's todo", completed: true }]);
+    await renderLoggedIn();
+
+    await fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+    setMockUser(otherUser);
+    await screen.findByText("t1:B's todo:true:false");
+
+    update.resolve({ id: "t1", title: "Buy milk", completed: true });
+    await flushPromises();
+
+    expect(screen.getByTestId("error")).toHaveTextContent("none");
+    expect(screen.getByText("t1:B's todo:true:false")).toBeInTheDocument();
+  });
+
+  it("reports a failed toggle of an unknown todo without adding or changing rows", async () => {
+    mockedSetCompleted.mockRejectedValue(new Error("boom"));
+    await renderLoggedIn([buyMilk()]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "toggle missing" }));
+
+    expect(await screen.findByText("Failed to update to-do.")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["t1:Buy milk:false:false"]);
+  });
+
+  it("ignores deleting a todo that is not in the list", async () => {
+    await renderLoggedIn([buyMilk()]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "delete missing" }));
+
+    expect(mockedDeleteTodo).not.toHaveBeenCalled();
+    expect(screen.getByTestId("error")).toHaveTextContent("none");
+    expect(screen.getByText("t1:Buy milk:false:false")).toBeInTheDocument();
+  });
+
+  it("shows an action error ahead of a fetch error", async () => {
+    mockedListTodos.mockRejectedValue(new Error("boom"));
+    mockedCreateTodo.mockRejectedValue(new Error("boom"));
+    renderProvider();
+    setMockUser(loggedInUser);
+    await screen.findByText("Failed to load to-dos.");
+
+    await fireEvent.click(screen.getByRole("button", { name: "create" }));
+
+    expect(await screen.findByText("Failed to create to-do.")).toBeInTheDocument();
+    expect(screen.queryByText("Failed to load to-dos.")).not.toBeInTheDocument();
+  });
+});
+
+describe("useTodos", () => {
+  it("throws when called outside of a TodoProvider", () => {
+    expect(() => render(() => <Consumer />)).toThrow("useTodos must be used within a TodoProvider");
   });
 });

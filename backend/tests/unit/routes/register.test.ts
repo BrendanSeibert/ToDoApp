@@ -29,6 +29,44 @@ describe("POST /api/auth/register", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a body that is not valid JSON", async () => {
+    mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn(), createUser: vi.fn() });
+    const response = await POST(createMockEvent({ method: "POST", rawBody: "{not json" }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "A valid email is required" });
+  });
+
+  it.each([
+    ["a numeric email", { email: 42, password: "longenough" }],
+    ["a null email", { email: null, password: "longenough" }],
+  ])("rejects %s", async (_label, body) => {
+    mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn(), createUser: vi.fn() });
+    const response = await POST(createMockEvent({ method: "POST", body }));
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a non-string password", async () => {
+    mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn(), createUser: vi.fn() });
+    const response = await POST(createMockEvent({ method: "POST", body: { email: "a@example.com", password: 12345678 } }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Password must be at least 8 characters" });
+  });
+
+  it("rejects a 7 character password but accepts exactly 8", async () => {
+    const createUser = vi.fn().mockResolvedValue({ id: "u1", email: "a@example.com", createdAt: "now" });
+    mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn().mockResolvedValue(null), createUser });
+
+    const tooShort = await POST(createMockEvent({ method: "POST", body: { email: "a@example.com", password: "1234567" } }));
+    expect(tooShort.status).toBe(400);
+    expect(createUser).not.toHaveBeenCalled();
+
+    const justEnough = await POST(createMockEvent({ method: "POST", body: { email: "a@example.com", password: "12345678" } }));
+    expect(justEnough.status).toBe(201);
+  });
+
   it("rejects a password shorter than 8 characters", async () => {
     mockedCreateUserRepository.mockReturnValue({ findByEmail: vi.fn(), createUser: vi.fn() });
     const event = createMockEvent({ method: "POST", body: { email: "a@example.com", password: "short" } });

@@ -54,6 +54,35 @@ describe("POST /api/todos", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a body that is not valid JSON", async () => {
+    const createTodo = vi.fn();
+    mockedCreateTodoRepository.mockReturnValue({ createTodo });
+    const event = createMockEvent({ method: "POST", rawBody: "{not json", cookies: authCookie });
+    const response = await POST(event);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Title is required" });
+    expect(createTodo).not.toHaveBeenCalled();
+  });
+
+  it("rejects a title that is not a string", async () => {
+    const createTodo = vi.fn();
+    mockedCreateTodoRepository.mockReturnValue({ createTodo });
+    const event = createMockEvent({ method: "POST", body: { title: 42 }, cookies: authCookie });
+    const response = await POST(event);
+
+    expect(response.status).toBe(400);
+    expect(createTodo).not.toHaveBeenCalled();
+  });
+
+  it("trims the title before saving it", async () => {
+    const createTodo = vi.fn().mockResolvedValue({ id: "t1", title: "Buy milk", completed: false });
+    mockedCreateTodoRepository.mockReturnValue({ createTodo });
+    await POST(createMockEvent({ method: "POST", body: { title: "  Buy milk  " }, cookies: authCookie }));
+
+    expect(createTodo).toHaveBeenCalledWith("u1", "Buy milk");
+  });
+
   it("creates a todo for the current user", async () => {
     const createTodo = vi.fn().mockResolvedValue({ id: "t1", title: "Buy milk", completed: false });
     mockedCreateTodoRepository.mockReturnValue({ createTodo });

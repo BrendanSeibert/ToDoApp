@@ -40,6 +40,22 @@ describe("PATCH /api/todos/:id", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a body that is not valid JSON", async () => {
+    const setCompleted = vi.fn();
+    mockedCreateTodoRepository.mockReturnValue({ setCompleted });
+    const event = createMockEvent({
+      method: "PATCH",
+      rawBody: "{not json",
+      params: { id: "t1" },
+      cookies: authCookie,
+    });
+    const response = await PATCH(event);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "completed must be a boolean" });
+    expect(setCompleted).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when the todo does not belong to the user", async () => {
     mockedCreateTodoRepository.mockReturnValue({ setCompleted: vi.fn().mockResolvedValue(null) });
     const event = createMockEvent({

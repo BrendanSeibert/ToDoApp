@@ -9,13 +9,14 @@ const mockedDeleteTodo = vi.fn();
 let mockedTodos: Array<{ id: string; title: string; completed: boolean }> = [];
 const [mockedLoading, setMockedLoading] = createSignal(false);
 let mockedError: string | null = null;
+let mockedPendingIds = new Set<string>();
 
 vi.mock("~/context/TodoContext", () => ({
   useTodos: () => ({
     todos: () => mockedTodos,
     loading: mockedLoading,
     error: () => mockedError,
-    isPending: () => false,
+    isPending: (id: string) => mockedPendingIds.has(id),
     createTodo: mockedCreateTodo,
     toggleTodo: mockedToggleTodo,
     deleteTodo: mockedDeleteTodo,
@@ -31,6 +32,7 @@ beforeEach(() => {
   mockedTodos = [];
   setMockedLoading(false);
   mockedError = null;
+  mockedPendingIds = new Set();
 });
 
 describe("TodoList", () => {
@@ -95,6 +97,21 @@ describe("TodoList", () => {
     await fireEvent.click(screen.getByRole("checkbox"));
 
     expect(mockedToggleTodo).toHaveBeenCalledWith("t1", true);
+  });
+
+  it("renders only the todos the context reports as pending as inert", () => {
+    mockedTodos = [
+      { id: "pending-1", title: "Saving", completed: false },
+      { id: "t1", title: "Buy milk", completed: false },
+    ];
+    mockedPendingIds = new Set(["pending-1"]);
+    renderWithI18n(() => <TodoList />);
+
+    const [saving, saved] = screen.getAllByRole("listitem");
+    expect(saving.querySelector("input")).toBeDisabled();
+    expect(saving).toHaveAttribute("aria-busy", "true");
+    expect(saved.querySelector("input")).toBeEnabled();
+    expect(saved).not.toHaveAttribute("aria-busy", "true");
   });
 
   it("calls deleteTodo when delete is clicked", async () => {

@@ -78,6 +78,30 @@ describe("startSession", () => {
     expect(getCookieOptions(event)).toMatchObject({ httpOnly: true, maxAge: SESSION_TTL_SECONDS });
   });
 
+  it("scopes the cookie to the whole site and blocks cross-site sends", async () => {
+    const event = createMockEvent({});
+    await startSession(event, "user-456");
+
+    expect(getCookieOptions(event)).toMatchObject({ path: "/", sameSite: "lax", httpOnly: true });
+  });
+
+  it("marks the cookie secure only in production", async () => {
+    const original = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "production";
+      const production = createMockEvent({});
+      await startSession(production, "user-456");
+      expect(getCookieOptions(production)).toMatchObject({ secure: true });
+
+      process.env.NODE_ENV = "development";
+      const development = createMockEvent({});
+      await startSession(development, "user-456");
+      expect(getCookieOptions(development)).toMatchObject({ secure: false });
+    } finally {
+      process.env.NODE_ENV = original;
+    }
+  });
+
   it("issues a different token for every session", async () => {
     const first = createMockEvent({});
     const second = createMockEvent({});

@@ -91,6 +91,18 @@ describe("userRepository", () => {
     expect(user?.id).toBe("u1");
   });
 
+  it("findById returns the user's properties when found and closes the session", async () => {
+    const driver = createMockDriver(() => ({
+      records: [fakeRecord({ u: { properties: { id: "u1", email: "a@example.com" } } })],
+    }));
+
+    await expect(createUserRepository(driver).findById("u1")).resolves.toEqual({
+      id: "u1",
+      email: "a@example.com",
+    });
+    expect(driver.session().close).toHaveBeenCalledTimes(1);
+  });
+
   it("findById returns null when no user matches", async () => {
     const driver = createMockDriver(() => ({ records: [] }));
     const repo = createUserRepository(driver);
