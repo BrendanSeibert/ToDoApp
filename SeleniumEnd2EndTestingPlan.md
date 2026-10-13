@@ -29,7 +29,7 @@ This document is written so that a developer who has never seen this repo, or an
 
 - No cross-browser matrix (Chrome only).
 - No visual-regression or performance testing.
-- No changes to application code, unless a step explicitly says so.
+- No changes to application code, unless a step explicitly says so. (The only such cases are the temporary deliberate break in Step 11 and the optional `data-testid` hooks in sections 9 and 10.)
 - Not part of the default `npm test` in `frontend/` or `backend/` (it needs Docker and Chrome and takes minutes).
 
 ## 2. Words you need to know
@@ -66,6 +66,8 @@ Read this section carefully; several are easy to trip over.
 
 Symptom of getting this wrong: you log in, the app flashes the to-do screen, then returns to the login screen.
 
+**Cookies ignore ports, so two stacks share one cookie jar.** The dev stack (`localhost:3001`) and the e2e stack (`localhost:3101`) set a cookie with the same name on the host `localhost`. In one ordinary Chrome profile, logging in to one logs you out of the other. The automated runs are unaffected (Selenium starts a fresh temporary profile), but when you check things **by hand** (Step 2, Step 14 row 5) use a private/incognito window or a separate Chrome profile for each stack.
+
 ### 3.3 Visible text
 
 All UI text comes from `frontend/src/i18n/en.json`. Tests **import that file** instead of hard-coding English, so a wording change does not break every test. The strings tests care about:
@@ -96,18 +98,24 @@ All UI text comes from `frontend/src/i18n/en.json`. Tests **import that file** i
 |---|---|
 | Registering an email that exists | An account with this email already exists |
 | Wrong password or unknown email on login | Invalid email or password |
+| Registering an email without a dot in the domain (e.g. `user@localhost`; Chrome accepts it, the server's regex does not) | A valid email is required |
 
-Put these in one constants file in the e2e package (Step 7).
+Put these in one constants file in the e2e package (Step 7). ("Password must be at least 8 characters" also exists on the server but cannot be reached through the UI, because Chrome blocks the submit first.)
 
 ### 3.5 Behaviours that affect how tests are written
 
-1. **Emails are lower-cased by the backend.** Generate lower-case emails in tests, otherwise the email shown on screen will not match what you typed.
+1. **Emails are lower-cased by the backend.** Generate lower-case emails in tests, otherwise the email shown on screen will not match what you typed. (The one deliberate exception is the case-insensitivity scenario in section 6, which types mixed case on purpose.)
 2. **Passwords must be at least 8 characters.**
 3. **The browser validates the form before the server does.** The email field is `type="email" required` and the password field has `minLength=8`. Typing a short password with Selenium and pressing Submit makes Chrome show its own tooltip and **no request is sent**, so no server error appears. Test this by asserting the form did not submit (still on the auth screen, no alert) and that the input's validity flag is set. Do not look for a server message.
 4. **The real checkbox is visually hidden** (1px, transparent). Selenium cannot click it. Click the visible icon (`.checkbox-icon`) or the label instead, and read the state from the hidden input's `isSelected()`.
-5. **The "Enter a to-do item" message disappears** after 15 seconds, or as soon as the user types. The 15-second case is slow; make it skippable (Step 10).
+5. **The "Enter a to-do item" message disappears** after 15 seconds, or as soon as the user types. The 15-second case is slow; make it skippable and give it its own timeout (Step 10). The same timer is better covered with fake timers in the frontend unit tests; keep the e2e version only as a real-browser sanity check.
 6. **Deleting an account logs you out** and returns to the login screen. Logging in again with those credentials must fail with "Invalid email or password".
 7. **Add and delete currently wait for the server** before the list updates. If the "optimistic add/delete" change (see `OptimisticAddDeletePlan.md`) is implemented later, rows appear immediately. Write waits as "wait until the row is present / gone", never "assume it is present right after the click", and the tests work in both worlds.
+8. **Toggling a to-do is already optimistic** (`toggleTodo` in `frontend/src/context/TodoContext.tsx`). The checkbox and the `completed` class change immediately, **before** the PATCH request has finished. If a test toggles and then immediately reloads the page, the reload can abort the request and the change is lost, so the test fails at random. Before any reload, wait until the **server** reports the new state (`TodoPage.toggle()` and `waitForSaved()` in Step 8 do this by asking the API from inside the page). Use the same helpers after add and delete too, so the suite stays correct once those become optimistic.
+9. **The to-do input and Add button are `disabled`** while the list is loading or a create is in flight. Typing into a disabled input throws `ElementNotInteractableError`, so "ready" means "input enabled", not just "input present". `TodoPage.typeTitle()` waits for this.
+10. **Titles are trimmed by the server** (and by the form), so `"  Buy milk  "` is stored and shown as `Buy milk`.
+11. **Titles are rendered as text**, so HTML characters such as `<b>` appear literally and are not interpreted.
+12. **Passwords sent to the login form must also be 8 or more characters.** The `minLength=8` check applies to login too. A "wrong password" test that uses a short wrong password never reaches the server.
 
 ### 3.6 Selectors available today
 
@@ -261,7 +269,7 @@ services:
 
 2. Wait for the containers: `docker compose -p todo-e2e -f docker-compose.e2e.yml ps` should list all three as running. The backend may take 10 to 30 seconds after Neo4j is healthy.
 
-3. In **Chrome**, open `http://localhost:5273`.
+3. In a **private/incognito Chrome window** (so cookies from your dev stack on `localhost:5173` cannot interfere; see section 3.2), open `http://localhost:5273`.
 
 4. Do this by hand: click "Need an account? Register" → enter `manual-check@example.com` and `correct-horse-battery` → Register → you should land on the To-Dos screen → add a to-do → click "Log out" → log back in → the to-do should still be there.
 
@@ -287,6 +295,8 @@ services:
    ```
 
    (`cross-env` makes `VAR=value command` work on Windows too.)
+
+   Recent `selenium-webdriver` 4.x releases may ship their own TypeScript types. After installing, check `node_modules/selenium-webdriver/package.json` for a `"types"` field. If it is present, uninstall `@types/selenium-webdriver` (two sets of types conflict).
 
 2. Edit `e2e/package.json`. Set `"type": "module"`, `"private": true`, and these scripts (keep the `devDependencies` npm generated):
 
@@ -339,8 +349,9 @@ services:
        hookTimeout: 60_000,
        // One browser at a time at first. Tests use unique users, so parallel is possible later.
        fileParallelism: false,
-       // One retry absorbs the odd timing hiccup without hiding real failures.
-       retry: 1,
+       // No retries: a test that fails once is flaky and must be fixed (Step 11). A retry would
+       // turn that failure into a silent pass. Only raise this for CI, and then report retried tests.
+       retry: 0,
      },
    });
    ```
@@ -427,14 +438,17 @@ Create `e2e/src/globalSetup.ts`:
 ```ts
 import { config } from "./config";
 
-async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
+async function waitForUrl(url: string, timeoutMs: number, init?: RequestInit): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
   while (Date.now() < deadline) {
     try {
-      // Any HTTP response (even a 401) proves the server is up.
-      await fetch(url);
-      return;
+      // Any non-5xx response (even a 401) proves the server is up. A 5xx means the server is
+      // answering but something behind it (usually the database) is not ready yet.
+      const response = await fetch(url, init);
+      if (response.status < 500) return;
+      lastError = new Error(`HTTP ${response.status}`);
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
     } catch (error) {
       lastError = error;
       await new Promise((resolve) => setTimeout(resolve, 1_000));
@@ -444,10 +458,19 @@ async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
 }
 
 export default async function setup(): Promise<void> {
-  await waitForUrl(`${config.apiUrl}/api/auth/me`, 120_000);
+  // A login attempt with unknown credentials makes the backend query Neo4j and then answer 401.
+  // (GET /api/auth/me with no cookie answers 401 *before* touching the database, so it would
+  // prove only that the HTTP server is up, not that the database connection works.)
+  await waitForUrl(`${config.apiUrl}/api/auth/login`, 120_000, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "readiness-probe@example.com", password: "not-a-real-password" }),
+  });
   await waitForUrl(config.baseUrl, 120_000);
 }
 ```
+
+The expected status for the probe is 401. The fixed 1-second pause inside the retry loop is a polling interval for the readiness check, not a sleep inside a test.
 
 ---
 
@@ -488,6 +511,8 @@ export function t(key: string, params: Record<string, string | number> = {}): st
 export const serverMessages = {
   emailTaken: "An account with this email already exists",
   badCredentials: "Invalid email or password",
+  // The backend requires a dot in the domain; Chrome's type="email" does not (e.g. "user@localhost").
+  invalidEmail: "A valid email is required",
 };
 ```
 
@@ -496,9 +521,11 @@ export const serverMessages = {
 ```ts
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { WebDriver } from "selenium-webdriver";
 
-const dir = path.resolve(__dirname, "../../artifacts");
+// This package is an ES module, where `__dirname` does not exist by definition.
+const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../artifacts");
 
 /** Saves a screenshot and the page HTML so a failure can be diagnosed afterwards. */
 export async function saveArtifacts(driver: WebDriver, testName: string): Promise<void> {
@@ -509,8 +536,6 @@ export async function saveArtifacts(driver: WebDriver, testName: string): Promis
   await writeFile(path.join(dir, `${stamp}-${safe}.html`), await driver.getPageSource());
 }
 ```
-
-> If `__dirname` is undefined in your Vitest setup (it is an ES module package), use `path.dirname(fileURLToPath(import.meta.url))` instead.
 
 ---
 
@@ -539,16 +564,35 @@ export abstract class BasePage {
     return element;
   }
 
-  /** Waits until a condition returns a truthy value, retrying (handy for re-rendered rows). */
-  protected async waitUntil<T>(description: string, condition: () => Promise<T | false | null | undefined>): Promise<T> {
-    const result = await this.driver.wait(async () => {
-      try {
-        return (await condition()) || false;
-      } catch {
-        return false; // stale element or not there yet: try again
-      }
-    }, config.waitMs, `Timed out waiting for: ${description}`);
-    return result as T;
+  /**
+   * Waits until a condition returns a truthy value, retrying (handy for re-rendered rows).
+   * `timeoutMs` defaults to config.waitMs; raise it only for conditions that are slow by nature.
+   */
+  protected async waitUntil<T>(
+    description: string,
+    condition: () => Promise<T | false | null | undefined>,
+    timeoutMs: number = config.waitMs,
+  ): Promise<T> {
+    // Errors thrown by the condition are retried (stale element, not there yet), but the last
+    // one is remembered and added to the timeout message. Without it a typo'd selector or an
+    // ElementNotInteractableError would only ever show up as "Timed out waiting for: ...".
+    let lastError: unknown;
+    try {
+      const result = await this.driver.wait(async () => {
+        try {
+          const value = await condition();
+          lastError = undefined;
+          return value || false;
+        } catch (error) {
+          lastError = error;
+          return false;
+        }
+      }, timeoutMs, `Timed out waiting for: ${description}`);
+      return result as T;
+    } catch (error) {
+      if (lastError === undefined) throw error;
+      throw new Error(`${(error as Error).message}. Last error while waiting: ${String(lastError)}`);
+    }
   }
 }
 ```
@@ -624,10 +668,16 @@ export class AuthPage extends BasePage {
     return (await this.driver.findElements(alert)).length > 0;
   }
 
-  /** True when Chrome's own form validation flagged the password as too short (no request was sent). */
-  async passwordIsTooShort(): Promise<boolean> {
+  /**
+   * True when Chrome's own form validation rejects the current field values (no request was sent).
+   * Note: Chrome only reports "too short" (`minLength`) for values it considers user-edited, and
+   * `checkValidity()` has the same rule. This works because `fill()` types with real key events
+   * (`sendKeys`). Do not "optimise" `fill()` to set `value` through a script: the form would then
+   * look valid and the short-password test would fail.
+   */
+  async formIsInvalid(): Promise<boolean> {
     const input = await this.visible(password);
-    return this.driver.executeScript<boolean>("return arguments[0].validity.tooShort", input);
+    return this.driver.executeScript<boolean>("return !arguments[0].form.checkValidity()", input);
   }
 }
 ```
@@ -635,9 +685,15 @@ export class AuthPage extends BasePage {
 **`e2e/src/pages/TodoPage.ts`**
 
 ```ts
-import { By, type WebElement } from "selenium-webdriver";
+import { By, Key, type WebElement } from "selenium-webdriver";
+import { config } from "../config";
 import { t } from "../helpers/strings";
 import { BasePage } from "./BasePage";
+
+interface ServerTodo {
+  title: string;
+  completed: boolean;
+}
 
 const root = By.css(".todo-app");
 const input = By.css('.todo-list input[type="text"]');
@@ -653,11 +709,19 @@ export class TodoPage extends BasePage {
   /** Waits for the signed-in screen and for the initial list fetch to finish. */
   async waitUntilReady(): Promise<void> {
     await this.visible(root);
-    await this.visible(input);
+    await this.waitUntilFormEnabled();
     await this.waitUntil("list finished loading", async () => {
       const source = await this.driver.getPageSource();
       return !source.includes(t("todos.loading"));
     });
+  }
+
+  /**
+   * The input is disabled while the list loads or a create is in flight, so "enabled" is the
+   * app's own readiness signal. Typing into a disabled input would throw.
+   */
+  private async waitUntilFormEnabled(): Promise<void> {
+    await this.waitUntil("to-do form to be enabled", async () => (await this.visible(input)).isEnabled());
   }
 
   async navbarTitle(): Promise<string> {
@@ -665,6 +729,7 @@ export class TodoPage extends BasePage {
   }
 
   async typeTitle(value: string): Promise<void> {
+    await this.waitUntilFormEnabled();
     const field = await this.visible(input);
     await field.clear();
     await field.sendKeys(value);
@@ -677,6 +742,16 @@ export class TodoPage extends BasePage {
   async addTodo(value: string): Promise<void> {
     await this.typeTitle(value);
     await this.clickAdd();
+  }
+
+  /**
+   * Submits the form with the Enter key instead of the Add button. Pass a value to type first,
+   * or omit it to press Enter in the input as it is (used for the empty-input scenarios).
+   */
+  async submitWithEnter(value?: string): Promise<void> {
+    if (value !== undefined) await this.typeTitle(value);
+    else await this.waitUntilFormEnabled();
+    await (await this.visible(input)).sendKeys(Key.ENTER);
   }
 
   async inputValue(): Promise<string> {
@@ -707,9 +782,49 @@ export class TodoPage extends BasePage {
     await this.waitUntil(`row "${value}" to disappear`, async () => (await this.findRow(value)) === null);
   }
 
+  /**
+   * Toggles the to-do and returns only once the SERVER has the new state. The checkbox flips
+   * immediately (the app updates optimistically), so without this wait a following reload
+   * could abort the request and lose the change (plan section 3.5, item 8).
+   */
   async toggle(value: string): Promise<void> {
+    const before = await this.isCompleted(value);
     const row = await this.waitUntil(`row "${value}"`, () => this.findRow(value));
     await row.findElement(checkboxIcon).click();
+    await this.waitUntil(
+      `server to report "${value}" as ${before ? "not completed" : "completed"}`,
+      async () => (await this.serverTodos()).some((todo) => todo.title === value && todo.completed === !before),
+    );
+  }
+
+  /** Waits until the server has a to-do with this title. Call before reloading the page. */
+  async waitForSaved(value: string): Promise<void> {
+    await this.waitUntil(`server to have "${value}"`, async () =>
+      (await this.serverTodos()).some((todo) => todo.title === value),
+    );
+  }
+
+  /** Waits until the server no longer has a to-do with this title. Call before reloading the page. */
+  async waitForSavedGone(value: string): Promise<void> {
+    await this.waitUntil(`server to no longer have "${value}"`, async () =>
+      (await this.serverTodos()).every((todo) => todo.title !== value),
+    );
+  }
+
+  /**
+   * Asks the API for the signed-in user's to-dos from inside the page, so the (HttpOnly)
+   * session cookie is sent. Returns [] if the request fails, which makes callers keep waiting.
+   */
+  private async serverTodos(): Promise<ServerTodo[]> {
+    const result = await this.driver.executeAsyncScript<ServerTodo[] | null>(
+      `const url = arguments[0];
+       const done = arguments[arguments.length - 1];
+       fetch(url, { credentials: "include" })
+         .then((response) => response.json())
+         .then((body) => done(body.todos ?? null), () => done(null));`,
+      `${config.apiUrl}/api/todos`,
+    );
+    return result ?? [];
   }
 
   async isCompleted(value: string): Promise<boolean> {
@@ -734,8 +849,23 @@ export class TodoPage extends BasePage {
     return (await this.driver.findElements(alert)).length > 0;
   }
 
-  async waitForAlertGone(timeoutMessage: string): Promise<void> {
-    await this.waitUntil(timeoutMessage, async () => !(await this.hasAlert()));
+  async waitForAlertGone(description: string, timeoutMs?: number): Promise<void> {
+    await this.waitUntil(description, async () => !(await this.hasAlert()), timeoutMs);
+  }
+
+  /**
+   * Fails if the alert disappears before `ms` have passed, and returns once they have.
+   * This is a polling wait with a deadline (not a fixed sleep): it checks the alert on every
+   * poll and fails the moment it is gone. Used for the 15-second message-expiry test.
+   */
+  async expectAlertPersistsFor(ms: number): Promise<void> {
+    const start = Date.now();
+    await this.driver.wait(async () => {
+      if (!(await this.hasAlert())) {
+        throw new Error(`The alert disappeared after ${Date.now() - start} ms, expected it to last ${ms} ms`);
+      }
+      return Date.now() - start >= ms;
+    }, ms + 5_000);
   }
 }
 ```
@@ -818,7 +948,13 @@ beforeEach(async () => {
   await resetBrowser(driver);
 });
 afterEach(async ({ task }) => {
-  if (task.result?.state === "fail") await saveArtifacts(driver, task.name);
+  if (task.result?.state !== "fail") return;
+  try {
+    await saveArtifacts(driver, task.name);
+  } catch (error) {
+    // A crashed browser must not replace the test's real failure with an artefact error.
+    console.warn(`Could not save failure artefacts: ${String(error)}`);
+  }
 });
 
 describe("smoke", () => {
@@ -827,6 +963,7 @@ describe("smoke", () => {
     const todos = new TodoPage(driver);
 
     await auth.open();
+    expect(await driver.getTitle()).toBe(t("app.title"));
     await auth.register(uniqueEmail("smoke"), TEST_PASSWORD);
 
     await todos.waitUntilReady();
@@ -863,8 +1000,9 @@ Rules for every test:
 1. **Each test registers its own user** with `uniqueEmail(...)`. No test may rely on another test's data or order.
 2. **Use waits, never sleeps.** Use the page-object `waitFor...` / `waitUntil` methods.
 3. **Assert on user-visible outcomes** (text, rows, which screen is showing), not on implementation details.
-4. **Use unique, simple to-do titles** (letters, digits, spaces; no quotes).
-5. **The 15-second test** is wrapped in `it.skipIf(config.skipSlow)(...)`, so `npm run test:fast` omits it.
+4. **Use unique, simple to-do titles** (letters, digits, spaces; no quotes). The one deliberate exception is the HTML-characters scenario in section 6.
+5. **The 15-second test** is wrapped in `it.skipIf(config.skipSlow)(...)`, so `npm run test:fast` omits it. Give it its own timeout as the third argument, because it legitimately runs longer than the 30-second default once registration is included: `it.skipIf(config.skipSlow)("...", async () => { ... }, 60_000)`. Use `expectAlertPersistsFor(10_000)` followed by `waitForAlertGone(..., 10_000)`; do not write a sleep.
+6. **Wait for the server before reloading.** Any test that changes data and then calls `driver.navigate().refresh()` must first call `waitForSaved(...)`, `waitForSavedGone(...)` or `toggle(...)` (which waits by itself). Reloading while a request is still in flight can drop the change (section 3.5, item 8).
 
 The exact assertions for every scenario are in section 6. Implement them in this order, running the suite after each file: `registration`, `login`, `todos`, `emptyInput`, `accountDeletion`, `isolation`.
 
@@ -872,7 +1010,7 @@ The exact assertions for every scenario are in section 6. Implement them in this
 
 ### Step 11. Make it reliable
 
-1. **Run the whole suite 3 times in a row.** All three runs must pass. Any test that fails once is flaky; fix the wait, do not add a sleep.
+1. **Run the whole suite 3 times in a row.** All three runs must pass. Any test that fails once is flaky; fix the wait, do not add a sleep. `retry` is `0` in `vitest.config.ts` precisely so that a single failure is visible rather than silently retried.
 2. **Prove the tests can fail.** Temporarily break one behaviour (for example, in `frontend/src/components/TodoList.tsx`, stop `showTitleRequired()` from being called), rebuild the stack (`npm run stack:up`), and confirm the empty-input test fails and leaves a screenshot in `e2e/artifacts/`. Revert the change.
 3. **Check the artefacts work.** After the deliberate failure, open the saved `.png` and `.html`. They should show the page at the moment of failure.
 4. **Headed run.** `npm run test:headed` should open a visible Chrome and replay a scenario. Useful for debugging.
@@ -888,19 +1026,32 @@ Create `e2e/scripts/run.mjs`:
 ```js
 // Starts the e2e stack, runs the tests, and always tears the stack down afterwards.
 // Set E2E_KEEP_STACK=1 to leave it running for faster repeat runs.
+//
+// No shell is used anywhere: with `shell: true` Node joins arguments without quoting them, so
+// `-t "adds a to-do"` would be split into three arguments on Windows. `docker` is a real
+// executable and Vitest is started through the current Node binary, so neither needs a shell.
 import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const compose = ["compose", "-p", "todo-e2e", "-f", "../docker-compose.e2e.yml"];
-const run = (command, args) =>
-  spawnSync(command, args, { stdio: "inherit", shell: process.platform === "win32" });
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const vitest = path.join(root, "node_modules", "vitest", "vitest.mjs");
+const compose = ["compose", "-p", "todo-e2e", "-f", path.join(root, "..", "docker-compose.e2e.yml")];
+const run = (command, args) => spawnSync(command, args, { stdio: "inherit", cwd: root });
+
+// Ctrl+C is delivered to this process and to the child. Without a handler Node would exit
+// immediately and skip the `finally` below, leaving the stack running. With a (no-op) handler the
+// child stops, `spawnSync` returns, and the teardown still happens.
+process.on("SIGINT", () => {});
 
 let status = 1;
 try {
   if (run("docker", [...compose, "up", "--build", "-d"]).status !== 0) {
     throw new Error("The e2e stack failed to start");
   }
-  // Extra CLI arguments are passed to Vitest, e.g. `npm run e2e -- tests/todos.e2e.test.ts`.
-  status = run("npx", ["vitest", "run", ...process.argv.slice(2)]).status ?? 1;
+  // Extra CLI arguments are passed to Vitest, e.g. `npm run e2e -- tests/todos.e2e.test.ts`
+  // or `npm run e2e -- -t "adds a to-do"`.
+  status = run(process.execPath, [vitest, "run", ...process.argv.slice(2)]).status ?? 1;
 } finally {
   if (process.env.E2E_KEEP_STACK !== "1") run("docker", [...compose, "down", "-v"]);
 }
@@ -955,6 +1106,8 @@ Setting `E2E_KEEP_STACK=1` makes `npm run e2e` leave the stack up.
 - *CORS errors in the console, or "Failed to fetch":* `FRONTEND_ORIGIN` and `VITE_API_URL` in `docker-compose.e2e.yml` must match the ports the browser uses. `VITE_API_URL` is baked into the frontend at build time, so rebuild (`npm run stack:up`) after changing it.
 - *Timeouts at the start of a run:* Neo4j can take a minute to become healthy on a cold start. The suite waits up to two minutes.
 - *Port already in use:* something else holds 3101 or 5273; change the ports in `docker-compose.e2e.yml` and `e2e/src/config.ts`.
+- *Checking the e2e app by hand while your dev stack is also open:* cookies are shared between ports on `localhost`, so one login replaces the other. Use a private window or a separate Chrome profile for each.
+- *The stack is still running after pressing Ctrl+C:* run `npm run stack:down`.
 
 **Adding a test:** put it in `e2e/tests/*.e2e.test.ts`, register a fresh user with `uniqueEmail()`, drive the UI only through the page objects in `e2e/src/pages/`, and use the explicit-wait helpers (never fixed sleeps). UI text comes from `frontend/src/i18n/en.json` via `e2e/src/helpers/strings.ts`.
 ````
@@ -973,7 +1126,9 @@ Run each of these and confirm the expected result:
 | 2 | `cd e2e && npm run e2e` from a clean state (no containers running) | All tests pass; stack is gone afterwards (`docker ps` shows no `todo-e2e` containers) |
 | 3 | `npm run e2e` three times in a row | Three passes |
 | 4 | `npm run e2e:fast` | Passes, skipping only the 15-second test |
-| 5 | Run the dev stack (`docker compose up`) and `npm run e2e` at the same time | No port conflict; both work |
+| 5 | Run the dev stack (`docker compose up`) and `npm run e2e` at the same time | No port conflict; both work (if you also open both apps by hand, use separate browser profiles, see section 3.2) |
+| 5a | `npm run e2e -- -t "adds a to-do with the Add button"` (a name containing spaces) | Only the matching test runs; the quoted name is not split |
+| 5b | Start `npm run e2e`, press Ctrl+C part-way through | The stack is torn down (`docker ps` shows no `todo-e2e` containers) |
 | 6 | Break one behaviour on purpose, rebuild, run | The matching test fails and writes a `.png` and `.html` to `e2e/artifacts/` |
 | 7 | `cd frontend && npm test` and `cd backend && npm test` | Unchanged and passing (the e2e package must not affect them) |
 | 8 | Follow the README section on a machine that has not run it before | The commands work as written |
@@ -990,7 +1145,8 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 |---|---|
 | registers a new user and lands on the to-do screen | Open app; `register(A)`; wait for the to-do screen; navbar title is `t("navbar.todos")`; `AccountMenu.shownEmail()` equals A's email; the list shows `t("todos.empty")` |
 | shows an error for an email that already exists | Register A; log out; on the login screen switch to register; register A again; `AuthPage.errorText()` equals `serverMessages.emailTaken`; still on the auth screen |
-| does not submit a password shorter than 8 characters | Show register; fill a valid email and `"short"`; submit; assert `passwordIsTooShort()` is true, `hasError()` is false, and the heading is still `t("auth.register.heading")` (browser validation blocked the request) |
+| does not submit a password shorter than 8 characters | Show register; fill a valid email and `"short"`; submit; assert `formIsInvalid()` is true, `hasError()` is false, and the heading is still `t("auth.register.heading")` (browser validation blocked the request) |
+| shows the server's error for an email Chrome accepts but the server rejects | Show register; fill `user@localhost` and a password of 8 or more characters; submit; `errorText()` equals `serverMessages.invalidEmail`; still on the auth screen |
 | can switch between login and register | Heading starts as `t("auth.login.heading")`; click the switch link; heading is `t("auth.register.heading")`; click again; back to login |
 
 ### `login.e2e.test.ts`
@@ -998,8 +1154,9 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 | Test | Steps and assertions |
 |---|---|
 | logs in with valid credentials | Register A; log out; `login(A)`; to-do screen shown; shown email equals A's |
-| rejects a wrong password | Register A; log out; `login` with the right email and a different password; `errorText()` equals `serverMessages.badCredentials`; still on the auth screen |
-| rejects an unknown email | `login` with a never-registered email; `errorText()` equals `serverMessages.badCredentials` |
+| rejects a wrong password | Register A; log out; `login` with the right email and a different password **of 8 or more characters** (a shorter one never reaches the server, section 3.5 item 12); `errorText()` equals `serverMessages.badCredentials`; still on the auth screen |
+| rejects an unknown email | `login` with a never-registered email and a password of 8 or more characters; `errorText()` equals `serverMessages.badCredentials` |
+| treats the email as case-insensitive | Register with a mixed-case email such as `E2E-Case-<unique>@Example.com`; `AccountMenu.shownEmail()` equals the lower-case form; log out; `login` with the lower-case form; to-do screen shown |
 | logs out and stays logged out after a reload | Register A; `logOut()`; heading is `t("auth.login.heading")`; `driver.navigate().refresh()`; still the login screen |
 | keeps the session across a reload | Register A; refresh; to-do screen still shown with the same email |
 
@@ -1008,22 +1165,24 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 | Test | Steps and assertions |
 |---|---|
 | adds a to-do with the Add button | Register A; `addTodo("Buy milk")`; wait for the row; `titles()` equals `["Buy milk"]`; the input is empty again |
-| adds a to-do by pressing Enter | Type a title and send `Key.ENTER` to the input; the row appears |
+| adds a to-do by pressing Enter | `submitWithEnter("Enter title")`; the row appears; `titles()` equals `["Enter title"]` |
 | lists to-dos in the order they were added | Add "First", "Second", "Third" (waiting for each); `titles()` equals that order |
-| keeps to-dos after a reload | Add one; refresh; wait until ready; the row is still there |
-| marks a to-do completed and keeps it so | Add one; `toggle`; `isCompleted` is true; refresh; still true; toggle again; false |
-| deletes a to-do and keeps it deleted | Add two; delete one; `waitForTitleGone`; the other remains; refresh; still gone |
+| keeps to-dos after a reload | Add one; `waitForTitle`; `waitForSaved`; refresh; wait until ready; the row is still there |
+| marks a to-do completed and keeps it so | Add one; `toggle` (returns only once the server has the change); `isCompleted` is true; refresh; wait until ready; still true; `toggle` again; `isCompleted` is false; refresh; still false |
+| deletes a to-do and keeps it deleted | Add two; delete one; `waitForTitleGone`; `waitForSavedGone`; the other remains; refresh; wait until ready; still gone |
 | shows the empty state after deleting the last to-do | Add one; delete it; `emptyStateVisible()` is true |
+| trims whitespace around the title | Type `"  Padded title  "`; click Add; `waitForTitle("Padded title")`; `titles()` equals `["Padded title"]` |
+| shows HTML characters as plain text | Add the title `<b>bold</b>`; `waitForTitle("<b>bold</b>")`; the row's visible text is exactly `<b>bold</b>` (it was not interpreted as markup) |
 
 ### `emptyInput.e2e.test.ts`
 
 | Test | Steps and assertions |
 |---|---|
 | clicking Add with an empty input shows the error and adds nothing | Register A; `clickAdd()`; `alertText()` equals `t("todos.titleRequired")`; `rowCount()` is 0 |
-| pressing Enter on an empty input shows the same error | Focus the input; send `Key.ENTER`; same assertions |
+| pressing Enter on an empty input shows the same error | `submitWithEnter()` with no value; same assertions |
 | whitespace-only input is treated as empty | Type three spaces; `clickAdd()`; error shown; `rowCount()` is 0 |
 | typing makes the error disappear | Trigger the error; type one character; `waitForAlertGone` |
-| the error goes away by itself after 15 seconds *(slow, `skipIf(config.skipSlow)`)* | Trigger the error; assert still visible after about 10 s; wait up to 20 s for it to be gone |
+| the error goes away by itself after 15 seconds *(slow, `skipIf(config.skipSlow)`, test timeout 60 s)* | Trigger the error; `expectAlertPersistsFor(10_000)` (fails if it vanishes early); `waitForAlertGone(..., 10_000)` (it must be gone within the remaining time). Optional: the same timer is also covered with fake timers in the frontend unit tests |
 | a valid add clears the error | Trigger the error; type a title; click Add; no alert; the row exists |
 
 ### `accountDeletion.e2e.test.ts`
@@ -1055,7 +1214,13 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 | `StaleElementReferenceError` | The list re-rendered between finding and clicking | Use `waitUntil`/the page-object methods that re-find the row |
 | A test passes alone but fails in the suite | Shared state or timing assumption | Ensure the test registers its own user and waits on conditions |
 | `Missing UI string: ...` | A key was renamed in `en.json` | Update the key in the test or helper |
-| Short-password test finds no server error | Expected: Chrome blocks the submit | Assert `passwordIsTooShort()` as in section 6 |
+| Short-password test finds no server error | Expected: Chrome blocks the submit | Assert `formIsInvalid()` as in section 6 |
+| "Wrong password" or "unknown email" test finds no server error | The password used was shorter than 8 characters, so Chrome blocked the submit | Use a password of 8 or more characters |
+| A toggle / add / delete test passes alone but fails now and then after a reload | The reload happened while the request was still in flight, so the change was lost | Call `toggle()` / `waitForSaved()` / `waitForSavedGone()` before reloading (section 3.5 item 8) |
+| `ElementNotInteractableError` when typing in the to-do input | The input is disabled while the list loads or a create is in flight | Use `typeTitle()` / `addTodo()`, which wait for it to be enabled |
+| Manually opened app logs you out of the other stack | Both stacks set the same cookie on `localhost` (cookies ignore ports) | Use a private window or separate Chrome profile for each stack |
+| `npm run e2e -- -t "some name"` runs everything or errors | The runner was changed back to `shell: true`, which splits arguments on spaces | Keep `run.mjs` shell-free (Step 12) |
+| Stack still running after Ctrl+C | Teardown was skipped | `npm run stack:down`; keep the `SIGINT` handler in `run.mjs` |
 | Port 3101 or 5273 already in use | Another process holds it | Change the ports consistently (compose file and `config.ts`) |
 
 ## 8. Acceptance criteria
@@ -1064,7 +1229,10 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 - Every scenario in section 6 exists, with the assertions listed.
 - The suite passes three times in a row.
 - A deliberately broken behaviour makes the matching test fail and produces a screenshot and HTML in `e2e/artifacts/`.
-- No fixed sleeps anywhere in `e2e/`.
+- No fixed sleeps anywhere in `e2e/` (the 1-second polling interval in the readiness check in `globalSetup.ts` is the only timed pause, and it is not inside a test).
+- `retry` is `0`, and the suite passes without retries.
+- Every test that reloads the page after a change first waits for the server to have that change.
+- `npm run e2e -- -t "<name with spaces>"` works on Windows, and Ctrl+C still tears the stack down.
 - UI strings are read from `frontend/src/i18n/en.json`, not hard-coded (apart from the two server messages in `serverMessages.ts`).
 - The README has the new section, and following it works.
 - The existing frontend and backend test suites are unaffected.
@@ -1082,5 +1250,7 @@ Notation: **Given** a starting state, **When** an action, **Then** what to asser
 - **CI:** a job could run `npm run e2e` on a runner that has Docker and Chrome (hosted Linux runners do). Upload `e2e/artifacts/` on failure. Not part of this change.
 - **Parallelism:** `fileParallelism` is off. Because every test uses a unique user, it could be turned on later to cut run time, once the suite has proven stable.
 - **Accessibility checks:** `@axe-core/webdriverjs` could assert the landmark, label and contrast fixes made earlier. Worth a follow-up.
-- **Optimistic add/delete:** if `OptimisticAddDeletePlan.md` is implemented, re-run this suite; it should pass unchanged because the waits are condition-based. Add scenarios for rollback by stopping the backend container mid-test.
+- **Optimistic add/delete:** if `OptimisticAddDeletePlan.md` is implemented, re-run this suite; it should pass unchanged because the waits are condition-based and tests wait for the server (`waitForSaved` / `waitForSavedGone`) before reloading. Add scenarios for rollback by stopping the backend container mid-test.
+- **Server-error states:** the messages `errors.loadTodos`, `errors.createTodo`, `errors.updateTodo` and `errors.deleteTodo` are not covered by this first version. They need a way to make the backend fail (stop the backend container mid-test, or a request-intercepting proxy), so they are a follow-up.
+- **Slow 15-second test:** if the frontend unit tests already cover the timer with fake timers, consider removing the e2e version to save about 15 seconds per run.
 - **`data-testid` hooks:** the suite currently relies on existing class names and ARIA labels. If the markup changes often, adding test ids would make selectors more stable.
