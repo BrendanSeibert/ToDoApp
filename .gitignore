@@ -14,3 +14,6 @@ frontend/dist/
 # Editor/OS
 .DS_Store
 .vscode/
+
+# E2E test failure artefacts
+e2e/artifacts/

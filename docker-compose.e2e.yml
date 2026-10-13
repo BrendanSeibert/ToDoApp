@@ -1,0 +1,46 @@
+# Throwaway stack for the Selenium end-to-end tests. Run it through e2e/scripts/run.mjs
+# (or `docker compose -p todo-e2e -f docker-compose.e2e.yml up --build -d`).
+#
+# Host ports are deliberately different from the dev stack (5173 / 3001) so both can run.
+# The browser reaches both services as "localhost"; see SeleniumEnd2EndTestingPlan.md
+# section 3.2 for why that matters (SameSite=Lax + Secure cookies).
+services:
+  neo4j-e2e:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/e2e-test-password
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p e2e-test-password 'RETURN 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend-e2e:
+    build:
+      context: ./backend
+      target: runtime
+    environment:
+      NEO4J_URI: bolt://neo4j-e2e:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: e2e-test-password
+      SESSION_SECRET: e2e-test-session-secret
+      # Must equal the address the browser uses for the frontend, port included.
+      FRONTEND_ORIGIN: http://localhost:5273
+      PORT: 3000
+    ports:
+      - "3101:3000"
+    depends_on:
+      neo4j-e2e:
+        condition: service_healthy
+
+  frontend-e2e:
+    build:
+      context: ./frontend
+      target: runtime
+      args:
+        # Baked into the JavaScript bundle at build time: the address the BROWSER uses for the API.
+        VITE_API_URL: http://localhost:3101
+    ports:
+      - "5273:80"
+    depends_on:
+      - backend-e2e

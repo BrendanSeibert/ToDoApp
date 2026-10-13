@@ -1,0 +1,23 @@
+{
+  "name": "todo-e2e",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "stack:up": "docker compose -p todo-e2e -f ../docker-compose.e2e.yml up --build -d",
+    "stack:down": "docker compose -p todo-e2e -f ../docker-compose.e2e.yml down -v",
+    "test": "vitest run",
+    "test:fast": "cross-env E2E_SKIP_SLOW=1 vitest run",
+    "test:headed": "cross-env HEADED=1 vitest run",
+    "e2e": "node scripts/run.mjs",
+    "e2e:fast": "cross-env E2E_SKIP_SLOW=1 node scripts/run.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/selenium-webdriver": "^4.35.7",
+    "cross-env": "^10.1.0",
+    "selenium-webdriver": "^4.51.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}
