@@ -25,11 +25,16 @@
   "account": {
     "logout": "Log out",
     "deleteAccount": "Delete account",
+    "deleteTitle": "Delete account",
     "deleteConfirmation": "Are you sure? This deletes your account and all to-dos.",
     "confirmDelete": "Confirm delete",
+    "deleting": "Deleting your account…",
     "cancel": "Cancel",
     "logoutError": "Failed to log out.",
     "deleteError": "Failed to delete account."
+  },
+  "popover": {
+    "close": "Close"
   },
   "todos": {
     "label": "New to-do",

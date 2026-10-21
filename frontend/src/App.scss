@@ -27,8 +27,7 @@ body {
     color: var(--text-color-app);
 
     :focus-visible {
-        outline: 2px solid var(--border-color-app-focus);
-        outline-offset: 2px;
+        @include t.focus-ring(var(--border-color-app-focus));
     }
 }
 

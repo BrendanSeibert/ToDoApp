@@ -59,6 +59,38 @@ describe("account deletion", () => {
     expect(await account.confirmationVisible()).toBe(false);
   });
 
+  it.each([
+    ["the close icon", (account: AccountMenu) => account.closeDeletionWithCloseIcon()],
+    ["Escape", (account: AccountMenu) => account.closeDeletionWithEscape()],
+    ["clicking outside the dialog", (account: AccountMenu) => account.closeDeletionByClickingOutside()],
+  ])("%s dismisses the confirmation and keeps the account", async (_label, dismiss) => {
+    const account = new AccountMenu(driver);
+    await register(uniqueEmail("del-dismiss"));
+
+    await account.startDelete();
+    expect(await account.dialogVisible()).toBe(true);
+    await dismiss(account);
+
+    expect(await account.dialogVisible()).toBe(false);
+    expect(await account.isVisible()).toBe(true);
+  });
+
+  it("opens with focus on Cancel and keeps Tab inside the dialog", async () => {
+    const account = new AccountMenu(driver);
+    await register(uniqueEmail("del-focus"));
+
+    await account.startDelete();
+    expect(await account.focusedDialogControl()).toBe(t("account.cancel"));
+
+    // Cancel -> Confirm -> Close -> back around to Cancel, never leaving the dialog.
+    await account.pressTab(1);
+    expect(await account.focusedDialogControl()).toBe(t("account.confirmDelete"));
+    await account.pressTab(2);
+    expect(await account.focusedDialogControl()).toBe(t("account.cancel"));
+    await account.pressTab(1, true);
+    expect(await account.focusedDialogControl()).toBe(t("popover.close"));
+  });
+
   it("confirming deletes the account and logs out", async () => {
     const account = new AccountMenu(driver);
     const auth = new AuthPage(driver);

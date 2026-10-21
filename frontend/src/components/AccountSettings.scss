@@ -10,12 +10,22 @@
     --text-color-account-settings-danger: #{p.$red-600};
     --border-color-account-settings-danger: #{p.$red-600};
     --surface-color-account-settings-danger-hover: #{p.$red-50};
-    --text-color-account-settings-confirm: #{p.$white};
-    --surface-color-account-settings-confirm: #{p.$red-600};
-    --surface-color-account-settings-confirm-hover: #{p.$red-700};
     --text-color-account-settings-error: #{p.$red-700};
     --surface-color-account-settings-error: #{p.$red-50};
     --border-color-account-settings-error: #{p.$red-600};
+}
+// The delete confirmation renders in a portal, outside .account-settings, so it carries its own variables.
+.d-account-delete-dialog {
+    --text-color-account-delete-dialog: #{p.$grey-900};
+    --surface-color-account-delete-dialog-button: #{p.$white};
+    --surface-color-account-delete-dialog-button-hover: #{p.$grey-50};
+    --border-color-account-delete-dialog-button: #{p.$grey-300};
+    --text-color-account-delete-dialog-confirm: #{p.$white};
+    --surface-color-account-delete-dialog-confirm: #{p.$red-600};
+    --surface-color-account-delete-dialog-confirm-hover: #{p.$red-700};
+    --text-color-account-delete-dialog-error: #{p.$red-700};
+    --surface-color-account-delete-dialog-error: #{p.$red-50};
+    --border-color-account-delete-dialog-error: #{p.$red-600};
 }
 .account-settings {
     display: flex;
@@ -51,16 +61,6 @@
         }
     }
 
-    .confirm {
-        background-color: var(--surface-color-account-settings-confirm);
-        border-color: var(--surface-color-account-settings-confirm);
-        color: var(--text-color-account-settings-confirm);
-
-        &:hover:not(:disabled) {
-            background-color: var(--surface-color-account-settings-confirm-hover);
-        }
-    }
-
     .error {
         @include t.message-shape;
         flex-basis: 100%;
@@ -68,5 +68,58 @@
         border-left-color: var(--border-color-account-settings-error);
         color: var(--text-color-account-settings-error);
         text-align: left;
+    }
+}
+.account-delete-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: t.$space-4;
+    color: var(--text-color-account-delete-dialog);
+
+    p {
+        margin: 0;
+    }
+
+    .visually-hidden {
+        @include t.visually-hidden;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: t.$space-2;
+    }
+
+    button {
+        @include t.button-shape-small;
+        background-color: var(--surface-color-account-delete-dialog-button);
+        border-color: var(--border-color-account-delete-dialog-button);
+        color: var(--text-color-account-delete-dialog);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-color-account-delete-dialog-button-hover);
+        }
+    }
+
+    .confirm {
+        background-color: var(--surface-color-account-delete-dialog-confirm);
+        border-color: var(--surface-color-account-delete-dialog-confirm);
+        color: var(--text-color-account-delete-dialog-confirm);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-color-account-delete-dialog-confirm-hover);
+        }
+
+        &:disabled {
+            opacity: 0.6;
+        }
+    }
+
+    .error {
+        @include t.message-shape;
+        background-color: var(--surface-color-account-delete-dialog-error);
+        border-left-color: var(--border-color-account-delete-dialog-error);
+        color: var(--text-color-account-delete-dialog-error);
     }
 }

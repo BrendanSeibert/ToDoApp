@@ -1,0 +1,74 @@
+@use "../styles/palette" as p;
+@use "../styles/tokens" as t;
+
+.d-popover {
+    --surface-color-popover-backdrop: #{p.$overlay};
+    --surface-color-popover: #{p.$white};
+    --border-color-popover: #{p.$grey-100};
+    --shadow-color-popover: #{p.$shadow};
+    --text-color-popover: #{p.$grey-900};
+    --border-color-popover-focus: #{p.$grey-900};
+    --text-color-popover-close: #{p.$black};
+    --text-color-popover-close-hover: #{p.$grey-600};
+    --surface-color-popover-close: #{p.$transparent};
+    --surface-color-popover-close-hover: #{p.$grey-50};
+    --border-color-popover-close: #{p.$transparent};
+    --border-color-popover-close-hover: #{p.$grey-300};
+}
+.popover {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: t.$space-4;
+    background-color: var(--surface-color-popover-backdrop);
+    font-family: t.$font-family;
+    line-height: t.$line-height;
+
+    // The app-wide focus ring lives under .app, which a portal escapes.
+    :focus-visible {
+        @include t.focus-ring(var(--border-color-popover-focus));
+    }
+
+    .popover-panel {
+        position: relative;
+        width: 100%;
+        max-width: t.$popover-width;
+        max-height: 100%;
+        overflow-y: auto;
+        padding: t.$space-6 t.$space-5 t.$space-5;
+        background-color: var(--surface-color-popover);
+        border: 1px solid var(--border-color-popover);
+        border-radius: t.$radius-lg;
+        box-shadow: 0 8px 24px var(--shadow-color-popover);
+        color: var(--text-color-popover);
+
+        &:focus {
+            outline: none; // Only parked on when nothing inside can take focus.
+        }
+    }
+
+    .popover-title {
+        margin: 0 t.$space-6 t.$space-4 0; // Right margin clears the close button.
+        font-size: t.$font-size-lg;
+        font-weight: 600;
+    }
+
+    .popover-close {
+        @include t.icon-button-shape(t.$space-1);
+        position: absolute;
+        top: t.$space-3;
+        right: t.$space-3;
+        background-color: var(--surface-color-popover-close);
+        border-color: var(--border-color-popover-close);
+        color: var(--text-color-popover-close);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface-color-popover-close-hover);
+            border-color: var(--border-color-popover-close-hover);
+            color: var(--text-color-popover-close-hover);
+        }
+    }
+}
