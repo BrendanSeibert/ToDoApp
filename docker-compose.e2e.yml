@@ -2,7 +2,7 @@
 # (or `docker compose -p todo-e2e -f docker-compose.e2e.yml up --build -d`).
 #
 # Host ports are deliberately different from the dev stack (5173 / 3001) so both can run.
-# The browser reaches both services as "localhost"; see SeleniumEnd2EndTestingPlan.md
+# The browser reaches both services as "localhost"; see docs/SeleniumEnd2EndTestingPlan.md
 # section 3.2 for why that matters (SameSite=Lax + Secure cookies).
 services:
   neo4j-e2e:
