@@ -1,6 +1,8 @@
 # To-Do List App
 
-A full-stack to-do list application with a [SolidJS](https://www.solidjs.com/) frontend, a [SolidStart](https://start.solidjs.com/) API backend, and a [Neo4j](https://neo4j.com/) database. Everything runs locally with Docker Compose.
+A to-do list application with a [SolidJS](https://www.solidjs.com/) frontend, a [SolidStart](https://start.solidjs.com/) API backend, and a [Neo4j](https://neo4j.com/) database. Everything runs locally with Docker Compose.
+
+
 
 ## Features
 
@@ -11,6 +13,17 @@ A full-stack to-do list application with a [SolidJS](https://www.solidjs.com/) f
 - Unit, integration and end-to-end tests at every layer.
 
 The original scope and design are described in [`docs/PLAN.md`](docs/PLAN.md).
+
+## Development approach
+
+This is my first project built with Claude. I wanted to explore developing with AI while maintaining ownership of the codebase and ensuring software best practices.
+I mainly used Claude's Sonnet 5.5 model for its efficiency and I found it sufficiently powerful for this project.
+
+For each feature, I described the desired changes in detail, and would prompt Claude to give me a list of steps required to complete the task. For smaller changes, I would review and tinker with the implementation strategy myself before asking Claude to follow the steps. For larger changes I had Claude put together plan files. I would review the files and I would also spin up fresh Claude instances to review the document, compare the plan to the codebase, and fine tune the plan.
+
+I instructed Claude to never commit any code. I wanted to review all code before committing so I always knew what changes were being made.
+
+There were a few things that I wanted implemented in very specific ways. In those cases I would implement a portion of it myself first. Then I would have a Claude instance review my work before having it follow the strategy. For example I styled one frontend component implementing a CSS color variable strategy, then I had Claude update the rest of the frontend components to align with that paradigm.
 
 ## Project structure
 
