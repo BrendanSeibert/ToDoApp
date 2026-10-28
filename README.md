@@ -16,7 +16,7 @@ The original scope and design are described in [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Development approach
 
-This is my first project built with Claude. I wanted to explore developing with AI while maintaining ownership of the codebase and ensuring software best practices.
+This is my first project built with Claude. I wanted to explore developing with AI while maintaining software best practices.
 I mainly used Claude's Sonnet 5.5 model for its efficiency and I found it sufficiently powerful for this project.
 
 For each feature, I described the desired changes in detail, and would prompt Claude to give me a list of steps required to complete the task. For smaller changes, I would review and tinker with the implementation strategy myself before asking Claude to follow the steps. For larger changes I had Claude put together plan files. I would review the files and I would also spin up fresh Claude instances to review the document, compare the plan to the codebase, and fine tune the plan.
